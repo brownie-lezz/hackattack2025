@@ -1,0 +1,13 @@
+.cover-letter {
+    background-color: #fffcf9;
+    border-color: #0c3486;
+    border-radius: 15px;
+    font-size: 10pt;
+    line-height: 1.5;
+}
+.letter-body {
+    color: rgb(49, 61, 93);
+}
+.cover-letter-input-card, .accordion {
+    border-radius: 15px!important;
+}

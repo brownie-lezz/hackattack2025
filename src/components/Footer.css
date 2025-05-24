@@ -1,0 +1,121 @@
+footer{
+    width: 100%;
+    position: absolute;
+    background: linear-gradient(to right,#00093c,#2d0b00);
+    color: #fff;
+    padding-top: 30px;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+footer .row{
+    width: 85%;
+    margin: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+footer .col{
+    flex-basis: 25%;
+    padding: 10px;
+}
+
+footer .col:nth-child(2), .col:nth-child(3){
+    flex-basis: 15%;
+}
+
+.col1 img{
+    width: 200px;
+    margin-bottom: 20px;
+}
+
+footer .col h3{
+    width: fit-content;
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.col2 h5{
+    margin: 20px 0;
+    width: fit-content;
+    border-bottom: 1px solid #ccc;
+}
+
+.col3 ul li{
+    list-style: none;
+    margin-bottom: 12px;
+}
+
+.col3 ul li a{
+    text-decoration: none;
+    color: #fff;
+}
+
+.col4 form{
+    padding-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #ccc;
+    margin-bottom: 20px; 
+}
+
+.col4 form .far{
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.col4 form input{
+    width: 100%;
+    background: transparent;
+    color: #ccc;
+    border: 0;
+    outline: none;
+}
+
+.col4 form button{
+    background: transparent;
+    border: 0;
+    outline: none;
+    cursor: pointer;
+}
+
+.col4 form button .fas{
+    font-size: 16px;
+    color: #ccc;
+}
+
+.social-icons .fab{
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 40px;
+    font-size: 20px;
+    color: #000;
+    background: #fff;
+    margin-right: 15px;
+}
+
+hr{
+    width: 90%;
+    border: 0;
+    border-bottom: 1px solid #ccc;
+    margin: 10px auto;
+}
+
+.copyright{
+    text-align: center;
+}
+
+@media screen and (max-width:700px) {
+    footer .col{
+        flex-basis: 100%;
+    }
+    
+    footer .col:nth-child(2), .col:nth-child(3){
+        flex-basis: 100%;
+    }
+}
