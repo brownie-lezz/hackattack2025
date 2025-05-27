@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import { useNavigate} from "react-router-dom";
 import axiosInstance from "../../utils/axios_instance";
-import { auth_urls } from "../../utils/config";
+import { auth_urls, API_URL } from "../../utils/config";
 import AuthContext from "../../context/AuthContext";
 import './user.css'
 import loginSvg from "./login.svg"
@@ -22,25 +22,42 @@ const Login = () => {
       return;
     }
 
-    axiosInstance
-      .post(auth_urls.LOGIN, { email: email, password: password })
-      .then((res) => {
-        localStorage.setItem("access_token", res.data.access);
-        localStorage.setItem("refresh_token", res.data.refresh);
-        axiosInstance.defaults.headers["Authorization"] =
-          "JWT " + localStorage.getItem("access_token");
+    fetch(`${API_URL}${auth_urls.LOGIN}`, {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: email, password: password })
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Login failed');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        console.log('Login successful:', data.message);
+        if (data.user && data.user.role) {
+          setUser(data.user);
+          if (data.user.role === 'seeker') {
+            navigate("/profile/seeker"); // Redirect to seeker profile
+          } else if (data.user.role === 'employer') {
+            navigate("/profile/employer"); // Redirect to employer profile
+          } else {
+             navigate("/"); // Default redirect if role is unexpected
+          }
+        } else {
+           navigate("/"); // Default redirect if user data or role is missing in response
+        }
 
-        // Update the user context with the user information returned by the API
-        axiosInstance.get("/auth/users/me").then((response) => {
-          setUser(response.data);
-        });
-        navigate("/");
         setError("");
       })
       .catch((err) => {
-        // console.log("Login error", err.request.responseText);
-        setError("Email or Password is invalid.");
+        console.error('Login error:', err);
+        setError(err.message || "Email or Password is invalid.");
       });
+
     setEmail("");
     setPassword("");
   };

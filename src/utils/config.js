@@ -1,8 +1,8 @@
-// const API_URL = "http://localhost:8000/";
+const API_URL = "http://localhost:8000/";
 
 const auth_urls = {
-  LOGIN: "auth/jwt/create/",
-  SIGNUP: "auth/users/",
+  LOGIN: "api/login",
+  SIGNUP: "api/signup",
   RESET_PASSWORD: "auth/users/reset_password/",
   RESET_PASSWORD_CONFIRM: "auth/users/reset_password_confirm/",
 };
@@ -10,8 +10,8 @@ const auth_urls = {
 const profile_urls = {
   SEEKER_PROFILE: "api/profile/seeker/",
   EMPLOYER_PROFILE: "api/profile/employer/",
-  COMPANY_PROFILE: "api/profile/employer/:id/",
-  APPLICANT_PROFILE: "api/profile/seeker/:id/",
+  COMPANY_PROFILE: "api/profile/employer/:id",
+  APPLICANT_PROFILE: "api/profile/seeker/:id",
 };
 
 const urls = {
@@ -33,4 +33,4 @@ const urls = {
   APPLICANT_RANKING: "api/jobs/applicant-ranking/:job_id/",
 };
 
-export { auth_urls, profile_urls, urls };
+export { API_URL, auth_urls, profile_urls, urls };

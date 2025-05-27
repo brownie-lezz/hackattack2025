@@ -122,12 +122,12 @@ const Navbar = () => {
         </span>
         <ul className="dropdown-menu">
           <li>
-            <Link className="dropdown-item" to="/signup">
+            <Link className="dropdown-item" to="/signup?role=seeker">
               <span>Seeker</span>
             </Link>
           </li>
           <li>
-            <Link className="dropdown-item" to="/signup-employer">
+            <Link className="dropdown-item" to="/signup?role=employer">
               <span>Employer</span>
             </Link>
           </li>
