@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 
@@ -21,6 +21,7 @@ import EmployerProfile from "./pages/profile/EmployerProfile";
 import EmployerProfileUpdate from "./pages/profile/EmployerProfileUpdate";
 import CompanyProfile from "./pages/profile/CompanyProfile";
 import ApplicantProfile from "./pages/profile/ApplicantProfile";
+import UpdateProfile from "./pages/user/UpdateProfile";
 // Jobs
 import JobList from "./pages/jobs/list/JobList";
 import JobCreate from "./pages/jobs/crud/JobCreate";
@@ -43,6 +44,7 @@ import ResumeRanking from "./pages/resume_ranking/ResumeRanking";
 // import ResumeBuilder from "./pages/resume/ResumeBuilder";
 import Letter from "./pages/cover_letter/Letter";
 import ResumeScreeningDashboard from './components/ResumeScreening/ResumeScreeningDashboard';
+import Footer from "./components/Footer";
 
 const theme = createTheme({
   palette: {
@@ -90,8 +92,7 @@ const App = () => (
       <AuthProvider>
         <Navbar />
         <Routes>
-          <Route exact path="/" element={<Home />} />
-          {/* user pages */}
+          <Route path="/" element={<Home />} />
           <Route exact path="/login" element={<Login />} />
           <Route exact path="/logout" element={<Logout />} />
           <Route exact path="/signup" element={<Signup />} />
@@ -99,33 +100,17 @@ const App = () => (
           <Route exact path="/reset-password" element={<ResetPassword />} />
           <Route
             exact
-            path="/password/reset/confirm/:uid/:token"
+            path="/reset-password-confirm"
             element={<ResetPasswordConfirm />}
           />
-          {/* profile pages */}
           <Route exact path="/profile/seeker" element={<SeekerProfile />} />
-          <Route
-            exact
-            path="/profile/seeker/update"
-            element={<SeekerProfileUpdate />}
-          />
-          <Route
-            exact
-            path="/profile/seeker/:id"
-            element={<ApplicantProfile />}
-          />
-          <Route
-            exact
-            path="/profile/employer/:id"
-            element={<CompanyProfile />}
-          />
+          <Route exact path="/profile/seeker/update" element={<SeekerProfileUpdate />} />
+          <Route exact path="/profile/seeker/update-new" element={<UpdateProfile />} />
+          <Route exact path="/profile/seeker/:id" element={<ApplicantProfile />} />
           <Route exact path="/profile/employer" element={<EmployerProfile />} />
-          <Route
-            exact
-            path="/profile/employer/update"
-            element={<EmployerProfileUpdate />}
-          />
-          {/* Job pages */}
+          <Route exact path="/profile/employer/update" element={<EmployerProfileUpdate />} />
+          <Route exact path="/profile/employer/update-new" element={<UpdateProfile />} />
+          <Route exact path="/profile/employer/:id" element={<CompanyProfile />} />
           <Route exact path="/jobs" element={<JobList />} />
           <Route exact path="/jobs/:id" element={<JobDetail />} />
           <Route exact path="/jobs/:id/update" element={<JobUpdate />} />
@@ -134,13 +119,11 @@ const App = () => (
           <Route exact path="/jobs/employer" element={<EmployerJobList />} />
           <Route exact path="/jobs/explore" element={<ScrapedJobList />} />
           <Route exact path="/jobs/bookmarks" element={<BookmarkJobList />} />
-          {/* Recommendations */}
           <Route
             exact
             path="/jobs/recommendations"
             element={<RecommendedJobList />}
           />
-          {/* Job Applications */}
           <Route
             exact
             path="/jobs/applications"
@@ -152,17 +135,15 @@ const App = () => (
             element={<JobApplicationsList />}
           />
           <Route exact path="/jobs/:id/apply" element={<ApplicationCreate />} />
-          {/* Applicant Ranking */}
           <Route
             exact
             path="/jobs/:id/applicant-ranking"
             element={<ResumeRanking />}
           />
-          {/* Resume */}
-          {/* <Route exact path="/resume" element={<ResumeBuilder />} /> */}
           <Route exact path="/cover-letter" element={<Letter />} />
           <Route path="/resume-screening" element={<ResumeScreeningDashboard />} />
         </Routes>
+        <Footer />
       </AuthProvider>
     </ThemeProvider>
   </BrowserRouter>

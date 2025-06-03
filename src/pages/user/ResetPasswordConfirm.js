@@ -1,42 +1,68 @@
-import React, { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import axiosInstance from "../../utils/axios_instance";
-import { auth_urls } from "../../utils/config";
+import React, { useState, useContext, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import AuthContext from "../../context/AuthContext";
+import supabase from "../../utils/supabase";
 
-const ResetPassword = () => {
+const ResetPasswordConfirm = () => {
   const navigate = useNavigate();
-  const { uid, token } = useParams();
+  const { updatePassword } = useContext(AuthContext);
 
-  const [new_password, setNewPassword] = useState("");
-  const [re_new_password, setReNewPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [hashFragment, setHashFragment] = useState("");
 
-  const handleSubmit = (e) => {
+  // Extract hash fragment from URL (Supabase adds auth parameters to URL hash)
+  useEffect(() => {
+    const hash = window.location.hash.substring(1);
+    if (hash) {
+      setHashFragment(hash);
+    }
+  }, []);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!new_password || !re_new_password) {
+    if (!newPassword || !confirmPassword) {
       setError("Must provide a new password.");
       return;
-    } else if (new_password !== re_new_password) {
+    } else if (newPassword !== confirmPassword) {
       setError("Passwords do not match.");
       return;
     }
 
-    axiosInstance
-      .post(auth_urls.RESET_PASSWORD_CONFIRM, {
-        uid,
-        token,
-        new_password,
-        re_new_password,
-      })
-      .then((res) => navigate("/login"))
-      .catch((err) => {
-        // console.log(err.request.responseText);
-        if (err.response.data.new_password) setError(err.response.data.new_password[0]);
-        else setError("Password is weak.");
-      });
-    setNewPassword("");
-    setReNewPassword("");
-    setError("");
+    try {
+      setLoading(true);
+      
+      // If there's a hash fragment, we need to first recover the session
+      if (hashFragment) {
+        const params = new URLSearchParams(hashFragment);
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+        
+        if (accessToken && refreshToken) {
+          // Set the session with the tokens from the URL
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+        }
+      }
+      
+      // Update the password
+      const { error } = await updatePassword(newPassword);
+      
+      if (error) throw error;
+      
+      // Success
+      navigate("/login");
+      setError("");
+    } catch (err) {
+      console.error("Error updating password:", err);
+      setError(err.message || "Failed to update password.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -60,7 +86,7 @@ const ResetPassword = () => {
                       type="password"
                       id="typePasswordX"
                       className="form-control form-control-lg"
-                      value={new_password}
+                      value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                     />
                     <label className="form-label" htmlFor="typePasswordX">
@@ -73,8 +99,8 @@ const ResetPassword = () => {
                       type="password"
                       id="typePasswordY"
                       className="form-control form-control-lg"
-                      value={re_new_password}
-                      onChange={(e) => setReNewPassword(e.target.value)}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                     />
                     <label className="form-label" htmlFor="typePasswordY">
                       Confirm Password
@@ -87,8 +113,9 @@ const ResetPassword = () => {
                     className="btn btn-outline-light btn-lg px-5"
                     type="submit"
                     onClick={handleSubmit}
+                    disabled={loading}
                   >
-                    Reset Password
+                    {loading ? "Updating..." : "Reset Password"}
                   </button>
                 </div>
 
@@ -108,4 +135,4 @@ const ResetPassword = () => {
   );
 };
 
-export default ResetPassword;
+export default ResetPasswordConfirm;
