@@ -3,8 +3,8 @@ import axios from "axios";
 const baseURL = "http://127.0.0.1:8000/";
 
 const removeTokens = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
 const axiosInstance = axios.create({
@@ -29,8 +29,8 @@ axiosInstance.interceptors.response.use(
     if (typeof error.response === "undefined") {
       alert(
         "A server/network error occurred. " +
-          "Looks like CORS might be the problem. " +
-          "Sorry about this - we will get it fixed shortly."
+        "Looks like CORS might be the problem. " +
+        "Sorry about this - we will get it fixed shortly."
       );
       return Promise.reject(error);
     }
@@ -49,7 +49,7 @@ axiosInstance.interceptors.response.use(
       error.response.statusText === "Unauthorized"
     ) {
       let refreshToken = localStorage.getItem("refresh_token");
-      
+
       // For unknown reasons, refresh_token was stored as 'undefined'(string). If this occurs delete the tokens 
       if (refreshToken === 'undefined') {
         console.log("refresh token is undefined");
@@ -57,7 +57,7 @@ axiosInstance.interceptors.response.use(
         // set refreshToken to falsy value so that below if's don't execute
         refreshToken = false
       }
-      
+
       if (refreshToken) {
         const tokenParts = JSON.parse(atob(refreshToken.split(".")[1]));
 
