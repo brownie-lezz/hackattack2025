@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const baseURL = "http://127.0.0.1:8000/";
+const baseURL = "http://localhost:8000/";
 
 const removeTokens = () => {
     localStorage.removeItem("access_token");
@@ -17,6 +17,7 @@ const axiosInstance = axios.create({
     "Content-Type": "application/json",
     accept: "application/json",
   },
+  withCredentials: true
 });
 
 axiosInstance.interceptors.response.use(

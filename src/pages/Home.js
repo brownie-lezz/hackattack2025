@@ -231,7 +231,7 @@ const Home = () => {
                   </Link>
                 </div>
                 <div className="col-lg-3 col-sm-6">
-                  <Link to="/ai-examination" style={{ textDecoration: "none", color: "inherit" }}>
+                  <Link to="/ai-examination/1" style={{ textDecoration: "none", color: "inherit" }}>
                     <div className="service theme-shadow p-lg-5 p-4">
                       <div className="iconbox">
                         <img src={resumeIcon} alt="" />
