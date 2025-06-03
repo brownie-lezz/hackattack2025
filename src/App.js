@@ -13,12 +13,10 @@ import EmployerSignup from "./pages/user/EmployerSignup";
 import ResetPassword from "./pages/user/ResetPassword";
 import ResetPasswordConfirm from "./pages/user/ResetPasswordConfirm";
 // Profile
-import SeekerProfile from "./pages/profile/SeekerProfile";
-import SeekerProfileUpdate from "./pages/profile/SeekerProfileUpdate";
 import EmployerProfile from "./pages/profile/EmployerProfile";
 import EmployerProfileUpdate from "./pages/profile/EmployerProfileUpdate";
-import CompanyProfile from "./pages/profile/CompanyProfile";
 import ApplicantProfile from "./pages/profile/ApplicantProfile";
+import ApplicantProfileUpdate from "./pages/profile/ApplicantProfileUpdate";
 // Jobs
 import JobList from "./pages/jobs/list/JobList";
 import JobCreate from "./pages/jobs/crud/JobCreate";
@@ -60,11 +58,11 @@ const App = () => (
           element={<ResetPasswordConfirm />}
         />
         {/* profile pages */}
-        <Route exact path="/profile/seeker" element={<SeekerProfile />} />
+        <Route exact path="/profile/seeker" element={<ApplicantProfile />} />
         <Route
           exact
           path="/profile/seeker/update"
-          element={<SeekerProfileUpdate />}
+          element={<ApplicantProfileUpdate />}
         />
         <Route
           exact
@@ -74,13 +72,19 @@ const App = () => (
         <Route
           exact
           path="/profile/employer/:id"
-          element={<CompanyProfile />}
+          element={<EmployerProfile />}
         />
         <Route exact path="/profile/employer" element={<EmployerProfile />} />
         <Route
           exact
           path="/profile/employer/update"
           element={<EmployerProfileUpdate />}
+        />
+        <Route exact path="/profile/applicant" element={<ApplicantProfile />} />
+        <Route
+          exact
+          path="/profile/applicant/update"
+          element={<ApplicantProfileUpdate />}
         />
         {/* Job pages */}
         <Route exact path="/jobs" element={<JobList />} />

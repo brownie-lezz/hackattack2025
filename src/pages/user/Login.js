@@ -1,11 +1,11 @@
 import { useContext, useState } from "react";
-import { useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../utils/axios_instance";
-import { auth_urls, API_URL } from "../../utils/config";
+import { auth_urls } from "../../utils/config";
 import AuthContext from "../../context/AuthContext";
-import './user.css'
-import loginSvg from "./login.svg"
-import {motion} from 'framer-motion'
+import './user.css';
+import loginSvg from "./login.svg";
+import { motion } from 'framer-motion';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -14,52 +14,61 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError("Please fill out all fields.");
       return;
     }
 
-    fetch(`${API_URL}${auth_urls.LOGIN}`, {
-      method: 'POST',
-      headers: {
-          'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email: email, password: password })
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Login failed');
-        }
-        return response.json();
-      })
-      .then((data) => {
-        console.log('Login successful:', data.message);
-        if (data.user && data.user.role) {
-          setUser(data.user);
-          if (data.user.role === 'seeker') {
-            navigate("/profile/seeker"); // Redirect to seeker profile
-          } else if (data.user.role === 'employer') {
-            navigate("/profile/employer"); // Redirect to employer profile
-          } else {
-             navigate("/"); // Default redirect if role is unexpected
-          }
-        } else {
-           navigate("/"); // Default redirect if user data or role is missing in response
-        }
+    setLoading(true);
+    setError("");
 
-        setError("");
-      })
-      .catch((err) => {
-        console.error('Login error:', err);
-        setError(err.message || "Email or Password is invalid.");
+    try {
+      const response = await axiosInstance.post(auth_urls.LOGIN, {
+        email: email,
+        password: password
       });
 
-    setEmail("");
-    setPassword("");
+      if (response.data) {
+        // Store tokens
+        if (response.data.access) {
+          localStorage.setItem("access_token", response.data.access);
+        }
+        if (response.data.refresh) {
+          localStorage.setItem("refresh_token", response.data.refresh);
+        }
+
+        // Set user data
+        if (response.data.user) {
+          setUser(response.data.user);
+          
+          // Redirect based on role
+          if (response.data.user.role === 'seeker') {
+            navigate("/profile/applicant");
+          } else if (response.data.user.role === 'employer') {
+            navigate("/profile/employer");
+          } else {
+            navigate("/");
+          }
+        } else {
+          navigate("/");
+        }
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error.response) {
+        setError(error.response.data.detail || 'Login failed. Please check your credentials.');
+      } else if (error.request) {
+        setError('No response from server. Please check your connection.');
+      } else {
+        setError('Error during login. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   let easeing = [0.6,-0.05,0.01,0.99];
@@ -145,8 +154,16 @@ const Login = () => {
                     type="submit"
                     onClick={handleSubmit}
                     whileHover={{scale:1.1}}
+                    disabled={loading}
                   >
-                    Login
+                    {loading ? (
+                      <>
+                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Logging in...
+                      </>
+                    ) : (
+                      'Login'
+                    )}
                   </motion.button>
                 </div>
               </div>

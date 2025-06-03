@@ -13,10 +13,9 @@ USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
 app = FastAPI()
 
 # Configure CORS
-# In a production environment, you should restrict origins to your frontend URL
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"], # Allow requests from your frontend
+    allow_origins=["*"],  # Allow all origins during development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,6 +73,28 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+# Add these new Pydantic models for profile data
+class ProfileResponse(BaseModel):
+    name: str
+    email: str
+    phone_number: str = None
+    city: str = None
+    country: str = None
+    job_title: str = None
+    bio: str = None
+    skills: str = None
+    github: str = None
+    linkedin: str = None
+    website: str = None
+
+class CompanyProfileResponse(BaseModel):
+    company_name: str
+    contact_email: str
+    company_location: str = None
+    country: str = None
+    company_description: str = None
+    linkedin: str = None
+    website: str = None
 
 def read_users():
     """Reads user data from the JSON file."""
@@ -189,6 +210,63 @@ async def login_user_endpoint(login_data: LoginRequest):
     # In a real application, you would generate a JWT or session token here
     # For now, just return a success message and the user's role and name
     return {"message": f"Login successful for user {user.get('name')}!", "user": {"name": user.get('name'), "role": user.get('role')}}
+
+# Add these new endpoints
+@app.get("/api/profile/seeker/")
+async def get_seeker_profile():
+    """Get the current user's seeker profile."""
+    users = read_users()
+    # In a real app, you would get the current user's ID from the session/token
+    # For now, we'll just return the first seeker user we find
+    user = next((user for user in users if user.get('role') == 'seeker'), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return user
+
+@app.get("/api/profile/seeker/{id}")
+async def get_seeker_profile_by_id(id: str):
+    """Get a seeker's profile by ID."""
+    users = read_users()
+    user = next((user for user in users if user.get('role') == 'seeker' and str(user.get('id')) == id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return user
+
+@app.get("/api/profile/employer/")
+async def get_employer_profile():
+    """Get the current user's employer profile."""
+    users = read_users()
+    # In a real app, you would get the current user's ID from the session/token
+    # For now, we'll just return the first employer user we find
+    user = next((user for user in users if user.get('role') == 'employer'), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return user
+
+@app.get("/api/profile/employer/{id}")
+async def get_employer_profile_by_id(id: str):
+    """Get an employer's profile by ID."""
+    users = read_users()
+    user = next((user for user in users if user.get('role') == 'employer' and str(user.get('id')) == id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return user
+
+@app.put("/api/profile/seeker/")
+async def update_seeker_profile(profile_data: ProfileResponse):
+    """Update the current user's seeker profile."""
+    users = read_users()
+    # In a real app, you would get the current user's ID from the session/token
+    # For now, we'll just update the first seeker user we find
+    user_index = next((i for i, user in enumerate(users) if user.get('role') == 'seeker'), None)
+    if user_index is None:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # Update the user's profile
+    users[user_index].update(profile_data.dict(exclude_unset=True))
+    write_users(users)
+    
+    return users[user_index]
 
 # You would typically run this with uvicorn:
 # python -m uvicorn backend.main:app --reload 

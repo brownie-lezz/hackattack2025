@@ -8,11 +8,29 @@
         "created_at": "2025-05-27 16:21:29.881776",
         "job_title": "Software engineer",
         "experience": "1 year",
-        "skills": [
-            "Communication",
-            "Leadership"
-        ],
+        "skills": " Communication, Leadership",
         "location": "Penang",
-        "resume_url": "1234"
+        "resume_url": "1234",
+        "phone_number": "",
+        "city": "",
+        "country": "",
+        "bio": "",
+        "github": "",
+        "linkedin": "",
+        "website": ""
+    },
+    {
+        "role": "employer",
+        "name": "The Mentholatum ",
+        "email": "julia@gmail.com",
+        "password": "1234",
+        "phone": "012345678",
+        "created_at": "2025-06-03 20:47:16.550292",
+        "industry": "Pharmaceutical ",
+        "company_size": "501+",
+        "company_website": "mentholatum.com",
+        "company_location": "Japan ",
+        "company_description": "Mentholatum is a well-known brand offering a variety of products for skincare and temporary relief of pain and discomfort.",
+        "contact_person": "CEO"
     }
 ]

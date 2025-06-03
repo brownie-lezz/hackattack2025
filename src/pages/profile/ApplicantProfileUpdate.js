@@ -6,38 +6,32 @@ import * as Yup from "yup";
 import axiosInstance from "../../utils/axios_instance";
 import { profile_urls } from "../../utils/config";
 import {
-  MyFloatingTextInput,
+  MyTextInput,
   MyTextArea,
+  MyFloatingTextInput,
 } from "../../components/Inputs";
 import "./profile.css";
 
-const EmployerProfileUpdate = () => {
+const ApplicantProfileUpdate = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     axiosInstance
-      .get(profile_urls.EMPLOYER_PROFILE)
+      .get(profile_urls.SEEKER_PROFILE)
       .then((res) => {
         setProfile(res.data);
       })
       .catch((err) => console.log(err));
   }, []);
 
-  const handleSubmit = async (formData) => {
-    setUploading(true);
-    try {
-      const response = await axiosInstance.put(profile_urls.EMPLOYER_PROFILE, formData);
-      if (response.data) {
-        navigate("/profile/employer");
-      }
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      alert('Failed to update profile. Please try again.');
-    } finally {
-      setUploading(false);
-    }
+  const handleSubmit = (formData) => {
+    axiosInstance
+      .put(profile_urls.SEEKER_PROFILE, formData)
+      .then((res) => {
+        navigate("/profile/applicant");
+      })
+      .catch((err) => console.log(err));
   };
 
   if (!profile) return <></>;
@@ -50,30 +44,36 @@ const EmployerProfileUpdate = () => {
             <div className="profile-form">
               <div className="card-body p-4">
                 <h2 className="text-center mb-4">
-                  <i className="fas fa-building me-2"></i>
-                  Edit Company Profile
+                  <i className="fas fa-user-edit me-2"></i>
+                  Edit Profile
                 </h2>
 
                 <Formik
                   initialValues={{
-                    company_name: profile.company_name,
-                    company_location: profile.company_location || "",
+                    name: profile.name,
+                    email: profile.email,
+                    city: profile.city || "",
                     country: profile.country || "",
-                    company_description: profile.company_description || "",
+                    phone_number: profile.phone_number || "",
+                    github: profile.github || "",
                     linkedin: profile.linkedin || "",
                     website: profile.website || "",
-                    contact_email: profile.contact_email,
+                    bio: profile.bio || "",
+                    job_title: profile.job_title || "",
+                    skills: profile.skills || ""
                   }}
                   validationSchema={Yup.object({
-                    company_name: Yup.string().required("Required"),
-                    contact_email: Yup.string()
-                      .email("Invalid email")
-                      .required("Required"),
-                    company_location: Yup.string(),
+                    name: Yup.string().required("Required"),
+                    email: Yup.string().email().required("Required"),
+                    city: Yup.string(),
                     country: Yup.string(),
-                    linkedin: Yup.string().url("Invalid url"),
-                    website: Yup.string().url("Invalid url"),
-                    company_description: Yup.string(),
+                    phoneNumber: Yup.string(),
+                    github: Yup.string().url("Enter a valid url"),
+                    linkedin: Yup.string().url("Enter a valid url"),
+                    website: Yup.string().url("Enter a valid url"),
+                    bio: Yup.string(),
+                    job_title: Yup.string(),
+                    skills: Yup.string(),
                   })}
                   onSubmit={(formData) => {
                     handleSubmit(formData);
@@ -82,26 +82,44 @@ const EmployerProfileUpdate = () => {
                   <Form>
                     <div className="form-section">
                       <h3 className="form-section-title">
-                        <i className="fas fa-building me-2"></i>
-                        Company Information
+                        <i className="fas fa-user me-2"></i>
+                        Basic Information
                       </h3>
                       <div className="row">
                         <div className="col-md-6 mb-3">
                           <MyFloatingTextInput
-                            label="Company Name"
-                            name="company_name"
+                            label="Name"
+                            name="name"
                             type="text"
-                            placeholder="Enter company name"
+                            placeholder="Enter your name"
                             required
                           />
                         </div>
                         <div className="col-md-6 mb-3">
                           <MyFloatingTextInput
-                            label="Contact Email"
-                            name="contact_email"
-                            type="email"
-                            placeholder="company@example.com"
+                            label="Job Title"
+                            name="job_title"
+                            type="text"
+                            placeholder="Eg: Web Developer, Frontend, Data Scientist,.."
                             required
+                          />
+                        </div>
+                      </div>
+                      <div className="row">
+                        <div className="col-md-6 mb-3">
+                          <MyFloatingTextInput
+                            label="Email Address"
+                            name="email"
+                            type="email"
+                            placeholder="name@example.com"
+                            required
+                          />
+                        </div>
+                        <div className="col-md-6 mb-3">
+                          <MyFloatingTextInput
+                            label="Phone Number"
+                            name="phone_number"
+                            type="text"
                           />
                         </div>
                       </div>
@@ -115,10 +133,9 @@ const EmployerProfileUpdate = () => {
                       <div className="row">
                         <div className="col-md-6 mb-3">
                           <MyFloatingTextInput
-                            label="Company Location"
-                            name="company_location"
+                            label="City"
+                            name="city"
                             type="text"
-                            placeholder="City, State"
                           />
                         </div>
                         <div className="col-md-6 mb-3">
@@ -126,7 +143,6 @@ const EmployerProfileUpdate = () => {
                             label="Country"
                             name="country"
                             type="text"
-                            placeholder="Country"
                           />
                         </div>
                       </div>
@@ -138,20 +154,28 @@ const EmployerProfileUpdate = () => {
                         Social Links
                       </h3>
                       <div className="row">
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-4 mb-3">
+                          <MyFloatingTextInput
+                            label="Github URL"
+                            name="github"
+                            type="text"
+                            placeholder="url"
+                          />
+                        </div>
+                        <div className="col-md-4 mb-3">
                           <MyFloatingTextInput
                             label="LinkedIn URL"
                             name="linkedin"
                             type="text"
-                            placeholder="https://linkedin.com/company/..."
+                            placeholder="url"
                           />
                         </div>
-                        <div className="col-md-6 mb-3">
+                        <div className="col-md-4 mb-3">
                           <MyFloatingTextInput
                             label="Website URL"
                             name="website"
                             type="text"
-                            placeholder="https://www.company.com"
+                            placeholder="url"
                           />
                         </div>
                       </div>
@@ -159,36 +183,31 @@ const EmployerProfileUpdate = () => {
 
                     <div className="form-section">
                       <h3 className="form-section-title">
-                        <i className="fas fa-info-circle me-2"></i>
-                        Company Details
+                        <i className="fas fa-tools me-2"></i>
+                        Professional Details
                       </h3>
                       <div className="mb-3">
-                        <MyTextArea
-                          label="Company Description"
-                          name="company_description"
+                        <MyTextInput
+                          label="Skills"
+                          name="skills"
                           type="text"
-                          placeholder="Tell us about your company..."
+                          placeholder="Enter skills separated by comma (eg: Web Developer, Data Scientist)"
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <MyTextArea
+                          label="Bio"
+                          name="bio"
+                          type="text"
+                          placeholder="Tell us about yourself..."
                         />
                       </div>
                     </div>
 
                     <div className="text-center mt-4">
-                      <button 
-                        type="submit" 
-                        className="btn btn-primary btn-lg px-5"
-                        disabled={uploading}
-                      >
-                        {uploading ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <i className="fas fa-save me-2"></i>
-                            Save Changes
-                          </>
-                        )}
+                      <button type="submit" className="btn btn-primary btn-lg px-5">
+                        <i className="fas fa-save me-2"></i>
+                        Save Changes
                       </button>
                     </div>
                   </Form>
@@ -202,4 +221,4 @@ const EmployerProfileUpdate = () => {
   );
 };
 
-export default EmployerProfileUpdate;
+export default ApplicantProfileUpdate; 

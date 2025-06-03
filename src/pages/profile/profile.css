@@ -1,61 +1,163 @@
+.profile-page {
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
 .profile-card {
   border: none;
-
-  position: relative;
+  border-radius: 15px;
   overflow: hidden;
-  border-radius: 8px;
+}
+
+.profile-picture-container {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+}
+
+.profile-picture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 4px solid #fff;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.profile-picture-overlay {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  padding: 8px;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.profile-card:before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 4px;
-  height: 100%;
-  background-color: #e1bee7;
-  transform: scaleY(1);
-  transition: all 0.5s;
-  transform-origin: bottom;
+.profile-picture-overlay:hover {
+  background: #fff;
+  transform: scale(1.1);
 }
 
-.profile-card:after {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 4px;
-  height: 100%;
-  background-color: #8e24aa;
-  transform: scaleY(0);
-  transition: all 0.5s;
-  transform-origin: bottom;
+.profile-name {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #2c3e50;
 }
 
-.profile-card:hover::after {
-  transform: scaleY(1);
+.contact-info {
+  color: #6c757d;
 }
 
-.profile-fonts {
-  font-size: 13px;
+.contact-info i {
+  width: 20px;
+  color: #3498db;
 }
 
-.social-list {
+.social-links {
   display: flex;
-  list-style: none;
   justify-content: center;
-  padding: 0;
+  gap: 1rem;
 }
 
-.social-list li, .social-list a {
-  padding: 10px;
-  color: #8e24aa;
-  font-size: 19px;
-}
-
-.profile-btn {
-  border: 1px solid #8e24aa;
-  color: #8e24aa;
+.social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
   height: 40px;
+  border-radius: 50%;
+  background: #f8f9fa;
+  color: #3498db;
+  transition: all 0.3s ease;
+}
+
+.social-link:hover {
+  background: #3498db;
+  color: #fff;
+  transform: translateY(-3px);
+}
+
+.section-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.section-title i {
+  color: #3498db;
+}
+
+.profile-bio {
+  color: #6c757d;
+  line-height: 1.6;
+}
+
+.skills-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skill-badge {
+  background: #e9ecef;
+  color: #495057;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.skill-badge:hover {
+  background: #3498db;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* Form styling for the update page */
+.profile-form {
+  background: #fff;
+  border-radius: 15px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+}
+
+.form-section {
+  padding: 2rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.form-section:last-child {
+  border-bottom: none;
+}
+
+.form-section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+}
+
+.form-control {
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  padding: 0.75rem 1rem;
+}
+
+.form-control:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+.btn-primary {
+  background: #3498db;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #2980b9;
+  transform: translateY(-2px);
 }
