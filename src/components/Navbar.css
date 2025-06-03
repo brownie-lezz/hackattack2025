@@ -1,0 +1,14 @@
+.nav-link {
+  border-bottom: 2px solid transparent;
+  transition: border-bottom 0.5s ease-in;
+}
+
+.nav-link:hover span {
+  color: red !important;
+  border-bottom: 2px solid red;
+}
+
+.navbar-fixed {
+  top: 0;
+  position: sticky;
+}

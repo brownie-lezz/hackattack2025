@@ -1,0 +1,88 @@
+/* login page css */
+.main-container {
+    position: relative; /* make the container relative for absolute positioning of ::before */
+    overflow: hidden; /* hide the overflow of ::before */
+  }
+  
+  .main-container::before {
+    content: ''; /* add content to the pseudo-element */
+    position: absolute; /* position the pseudo-element */
+    top: 0;
+    left: -50%; /* move the pseudo-element to the left by 50% of the container width */
+    width: 200%; /* set the width of the pseudo-element to 200% of the container width */
+    height: 100%; /* set the height of the pseudo-element to 100% of the container height */
+    background: linear-gradient(#15489b, #dd3e45); /* set the background gradient */
+    border-radius: 50% 50% 0 0; /* set the border-radius to create the curved shape */
+    transform: rotate(-20deg); /* rotate the pseudo-element to create the curve */
+    z-index: -1; /* set the z-index of the pseudo-element behind the container content */
+  }
+.panel img{
+    height: 300px;
+    width: 100%;
+}
+
+a{
+  text-decoration: none;
+}
+
+.panel1 img{
+  height: 300px;
+  width: 100%;
+}
+
+.signin{
+    width: 80%;
+    height: 95%;
+    margin: auto;
+    margin-top: 15px;
+}
+
+.description button{
+    text-decoration: none;
+}
+
+.description{
+    margin-top: 80px;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+@media screen and (max-width:993px) {
+    .panel img {
+        display: none;
+    }
+    .panel1 img {
+      display: none;
+  }
+}
+
+/* signup page css */
+.main-container1 {
+    position: relative; /* make the container relative for absolute positioning of ::before */
+    overflow: hidden; /* hide the overflow of ::before */
+  }
+  
+  .main-container1::before {
+    content: ''; /* add content to the pseudo-element */
+    position: absolute; /* position the pseudo-element */
+    bottom: 0;
+    right: -50%; /* move the pseudo-element to the left by 50% of the container width */
+    width: 200%; /* set the width of the pseudo-element to 200% of the container width */
+    height: 100%; /* set the height of the pseudo-element to 100% of the container height */
+    background: linear-gradient(#dd3e45, #15489b); /* set the background gradient */
+    border-radius: 0 0 50% 50%; /* set the border-radius to create the curved shape */
+    transform: rotate(20deg); /* rotate the pseudo-element to create the curve */
+    z-index: -1; /* set the z-index of the pseudo-element behind the container content */
+  }
+
+  @keyframes slide-in-right {
+    0% { transform: translateX(50%); } /* start with the element offscreen to the left */
+    100% { transform: translateX(0); } /* end with the element fully visible */
+  }
+
+  @keyframes slide-in-left {
+    0% { transform: translateX(-50%); } /* start with the element offscreen to the left */
+    100% { transform: translateX(0); } /* end with the element fully visible */
+  }
+  
