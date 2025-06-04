@@ -56,7 +56,9 @@ const API_ENDPOINTS = {
   
   // AI Features
   GENERATE_QUESTIONS: "api/generate-questions",
-  APPLICANT_RANKING: "api/jobs/applicant-ranking/:id"
+  APPLICANT_RANKING: "api/jobs/applicant-ranking/:id",
+  SALARY_PREDICTION: "api/jobs/salary-prediction",
+  SIMILAR_JOBS: "api/jobs/similar-jobs"
 };
 
 // For backward compatibility
@@ -92,6 +94,8 @@ const urls = {
   USER_APPLICATIONS: API_ENDPOINTS.USER_APPLICATIONS,
   JOB_APPLICATIONS_LIST: API_ENDPOINTS.JOB_APPLICATIONS,
   APPLICANT_RANKING: API_ENDPOINTS.APPLICANT_RANKING,
+  SALARY_PREDICTION: API_ENDPOINTS.SALARY_PREDICTION,
+  SIMILAR_JOBS: API_ENDPOINTS.SIMILAR_JOBS
 };
 
 export { 

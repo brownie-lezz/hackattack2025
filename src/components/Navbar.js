@@ -66,7 +66,7 @@ const Navbar = () => {
         </span>
         <ul className="dropdown-menu">
           <li>
-            <Link className="dropdown-item" to="/jobs/create">
+            <Link className="dropdown-item" to="/jobs/create-ai">
               <span>Create Job</span>
             </Link>
           </li>
