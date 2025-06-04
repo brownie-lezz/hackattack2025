@@ -5,9 +5,24 @@ import json
 import os
 import datetime
 from typing import List, Dict, Union
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Configure Google AI
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+# List available models
+available_models = [m.name for m in genai.list_models()]
+print("Available models:", available_models)  # This will help us see which models we can use
 
 # Define the path to the users JSON file
 USERS_FILE = os.path.join(os.path.dirname(__file__), 'users.json')
+
+# Define the path to the jobs JSON file
+JOBS_FILE = os.path.join(os.path.dirname(__file__), 'jobs.json')
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -96,6 +111,24 @@ class CompanyProfileResponse(BaseModel):
     linkedin: str = None
     website: str = None
 
+class QuestionGenerationRequest(BaseModel):
+    job_id: str
+    num_questions: int
+    question_types: List[str]
+    job_title: str = None
+    job_description: str = None
+    required_skills: List[str] = None
+
+class Job(BaseModel):
+    id: str
+    title: str
+    description: str
+    required_skills: List[str]
+    company: str
+    location: str
+    salary_range: str = None
+    job_type: str = None
+
 def read_users():
     """Reads user data from the JSON file."""
     if not os.path.exists(USERS_FILE):
@@ -124,6 +157,54 @@ def write_users(users):
     except Exception as e:
         print(f"Error writing users file: {e}")
 
+def read_jobs():
+    """Reads job data from the JSON file."""
+    if not os.path.exists(JOBS_FILE):
+        # Create sample jobs if file doesn't exist
+        sample_jobs = [
+            {
+                "id": "1",
+                "title": "Software Engineer",
+                "description": "We are looking for a skilled Software Engineer to join our team. The ideal candidate should have strong programming skills and experience with modern web technologies.",
+                "required_skills": ["JavaScript", "React", "Node.js", "Python", "SQL"],
+                "company": "Tech Solutions Inc",
+                "location": "New York, NY",
+                "salary_range": "$80,000 - $120,000",
+                "job_type": "Full-time"
+            },
+            {
+                "id": "2",
+                "title": "Data Scientist",
+                "description": "Join our data science team to work on exciting machine learning projects. The role involves developing and implementing data models and algorithms.",
+                "required_skills": ["Python", "Machine Learning", "Statistics", "SQL", "Data Analysis"],
+                "company": "Data Analytics Corp",
+                "location": "San Francisco, CA",
+                "salary_range": "$90,000 - $130,000",
+                "job_type": "Full-time"
+            }
+        ]
+        write_jobs(sample_jobs)
+        return sample_jobs
+
+    try:
+        with open(JOBS_FILE, 'r') as f:
+            content = f.read()
+            if not content:
+                return []
+            return json.load(f)
+    except json.JSONDecodeError:
+        return []
+    except Exception as e:
+        print(f"Error reading jobs file: {e}")
+        return []
+
+def write_jobs(jobs):
+    """Writes job data to the JSON file."""
+    try:
+        with open(JOBS_FILE, 'w') as f:
+            json.dump(jobs, f, indent=4)
+    except Exception as e:
+        print(f"Error writing jobs file: {e}")
 
 @app.post("/api/signup")
 async def signup_user_endpoint(user_data: SignupRequest):
@@ -211,62 +292,127 @@ async def login_user_endpoint(login_data: LoginRequest):
     # For now, just return a success message and the user's role and name
     return {"message": f"Login successful for user {user.get('name')}!", "user": {"name": user.get('name'), "role": user.get('role')}}
 
-# Add these new endpoints
-@app.get("/api/profile/seeker/")
-async def get_seeker_profile():
-    """Get the current user's seeker profile."""
-    users = read_users()
-    # In a real app, you would get the current user's ID from the session/token
-    # For now, we'll just return the first seeker user we find
-    user = next((user for user in users if user.get('role') == 'seeker'), None)
-    if not user:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return user
+@app.post("/api/generate-questions")
+async def generate_questions(request: QuestionGenerationRequest):
+    """Generate AI-powered interview questions based on job requirements."""
+    try:
+        # Initialize the model
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Create a more detailed prompt with job context and specific instructions
+        prompt = f"""You are an expert HR professional conducting an interview for a {request.job_title} position.
+        
+        Job Description: {request.job_description}
+        Required Skills: {', '.join(request.required_skills) if request.required_skills else 'Not specified'}
+        
+        Generate {request.num_questions} completely different interview questions. Each question must be unique in both topic and approach.
+        
+        Question Types to Include:
+        - Technical questions about specific skills
+        - Behavioral questions about past experiences
+        - Situational questions about hypothetical scenarios
+        - Problem-solving questions
+        - Leadership and teamwork questions
+        
+        Guidelines:
+        1. Each question must be completely different from the others
+        2. Questions should progress from general to specific
+        3. Include at least one question about each required skill
+        4. Mix different question types
+        5. Avoid similar questions or rephrasing of the same question
+        6. Make questions specific to the {request.job_title} role
+        7. First question should be a general introduction/background question
+        8. Second question should be about technical skills or experience
+        9. Third question should be about problem-solving or behavioral scenario
+        10. Fourth question should be about leadership or teamwork
+        11. Fifth question should be about future goals or company fit
+        
+        Format your response as a JSON array of strings, with no additional text or formatting.
+        Example format: ["Question 1?", "Question 2?", "Question 3?"]"""
 
-@app.get("/api/profile/seeker/{id}")
-async def get_seeker_profile_by_id(id: str):
-    """Get a seeker's profile by ID."""
-    users = read_users()
-    user = next((user for user in users if user.get('role') == 'seeker' and str(user.get('id')) == id), None)
-    if not user:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return user
+        print("Sending prompt to AI:", prompt)  # Debug log
 
-@app.get("/api/profile/employer/")
-async def get_employer_profile():
-    """Get the current user's employer profile."""
-    users = read_users()
-    # In a real app, you would get the current user's ID from the session/token
-    # For now, we'll just return the first employer user we find
-    user = next((user for user in users if user.get('role') == 'employer'), None)
-    if not user:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return user
+        # Generate response
+        response = model.generate_content(prompt)
+        
+        # Parse the response and extract questions
+        questions_text = response.text.strip()
+        print("Raw AI response:", questions_text)  # Debug log
+        
+        # Try to parse the response as JSON
+        try:
+            # Clean the response text before parsing
+            cleaned_text = questions_text
+            # Remove any markdown code block markers
+            cleaned_text = cleaned_text.replace('```json', '').replace('```', '')
+            # Remove any leading/trailing whitespace
+            cleaned_text = cleaned_text.strip()
+            
+            questions = json.loads(cleaned_text)
+            print("Parsed questions:", questions)  # Debug log
+            
+            # Clean each question
+            questions = [q.strip() for q in questions]
+            # Remove any remaining JSON artifacts
+            questions = [q.replace('[', '').replace(']', '').replace('{', '').replace('}', '') for q in questions]
+            # Remove any empty questions
+            questions = [q for q in questions if q and not q.isspace()]
+            
+        except json.JSONDecodeError as e:
+            print("JSON parsing error:", str(e))  # Debug log
+            # If the response isn't valid JSON, try to extract questions from the text
+            questions = [q.strip() for q in questions_text.split('\n') if q.strip()]
+            # Remove any markdown formatting, numbers, or JSON artifacts
+            questions = [q.lstrip('1234567890.- ').strip() for q in questions]
+            questions = [q.replace('[', '').replace(']', '').replace('{', '').replace('}', '') for q in questions]
+            # Remove any empty questions
+            questions = [q for q in questions if q and not q.isspace()]
+            print("Extracted questions after JSON error:", questions)  # Debug log
 
-@app.get("/api/profile/employer/{id}")
-async def get_employer_profile_by_id(id: str):
-    """Get an employer's profile by ID."""
-    users = read_users()
-    user = next((user for user in users if user.get('role') == 'employer' and str(user.get('id')) == id), None)
-    if not user:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return user
+        # Remove any duplicate questions
+        original_count = len(questions)
+        questions = list(dict.fromkeys(questions))
+        if len(questions) < original_count:
+            print(f"Removed {original_count - len(questions)} duplicate questions")  # Debug log
 
-@app.put("/api/profile/seeker/")
-async def update_seeker_profile(profile_data: ProfileResponse):
-    """Update the current user's seeker profile."""
-    users = read_users()
-    # In a real app, you would get the current user's ID from the session/token
-    # For now, we'll just update the first seeker user we find
-    user_index = next((i for i, user in enumerate(users) if user.get('role') == 'seeker'), None)
-    if user_index is None:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        # Ensure we have the requested number of questions
+        if len(questions) > request.num_questions:
+            questions = questions[:request.num_questions]
+        elif len(questions) < request.num_questions:
+            print(f"Not enough questions ({len(questions)}), adding default questions")  # Debug log
+            # If we don't have enough questions, add some generic ones
+            default_questions = [
+                "Can you walk me through your professional background and what led you to apply for this position?",
+                f"Tell me about your experience with {request.required_skills[0] if request.required_skills else 'the key technologies'} used in this role.",
+                "How do you handle challenging situations in the workplace?",
+                "What interests you most about this position at " + (request.job_title or "our company") + "?",
+                "Can you describe a project where you demonstrated leadership?"
+            ]
+            # Filter out any default questions that might be similar to existing ones
+            default_questions = [q for q in default_questions if not any(
+                q.lower() in existing.lower() or existing.lower() in q.lower() 
+                for existing in questions
+            )]
+            print("Filtered default questions:", default_questions)  # Debug log
+            questions.extend(default_questions[:request.num_questions - len(questions)])
+
+        print("Final questions:", questions)  # Debug log
+        return {"questions": questions}
+
+    except Exception as e:
+        print(f"Error generating questions: {str(e)}")  # Debug log
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    """Get job details by ID."""
+    jobs = read_jobs()
+    job = next((job for job in jobs if job.get('id') == job_id), None)
     
-    # Update the user's profile
-    users[user_index].update(profile_data.dict(exclude_unset=True))
-    write_users(users)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
     
-    return users[user_index]
+    return job
 
 # You would typically run this with uvicorn:
 # python -m uvicorn backend.main:app --reload 

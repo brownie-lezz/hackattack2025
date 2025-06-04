@@ -35,6 +35,8 @@ import JobApplicationsList from "./pages/job_applications/JobApplications";
 import ApplicationCreate from "./pages/job_applications/ApplicationCreate";
 // Applicant Ranking
 import ResumeRanking from "./pages/resume_ranking/ResumeRanking";
+// AI Examination
+import AIExamination from "./pages/ai-examination/AIExamination";
 // Resume
 // import ResumeBuilder from "./pages/resume/ResumeBuilder";
 import Letter from "./pages/cover_letter/Letter";
@@ -118,6 +120,12 @@ const App = () => (
           exact
           path="/jobs/:id/applicant-ranking"
           element={<ResumeRanking />}
+        />
+        {/* AI Examination */}
+        <Route
+          exact
+          path="/ai-examination/:id"
+          element={<AIExamination />}
         />
         {/* Resume */}
         {/* <Route exact path="/resume" element={<ResumeBuilder />} /> */}
