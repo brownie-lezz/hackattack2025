@@ -376,6 +376,14 @@ class ChatMessage(BaseModel):
     question: str
     analysis: Optional[dict] = None
 
+class QuestionGenerationRequest(BaseModel):
+    job_id: str
+    num_questions: int
+    question_types: List[str]
+    job_title: str
+    job_description: str
+    required_skills: List[str]
+
 # Routes
 @app.get("/")
 async def read_root():
@@ -384,6 +392,17 @@ async def read_root():
 @app.get("/jobs")
 async def get_jobs():
     return jobs_data
+
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    try:
+        # Find the job with the given ID
+        job = next((job for job in jobs_data if job["id"] == job_id), None)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        return job
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/users")
 async def get_users():
@@ -711,4 +730,84 @@ Please provide a clear and concise response focusing on the specific question as
         return {"response": response}
     except Exception as e:
         print(f"Error in chat with Mistral: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/generate-questions")
+async def generate_questions(request: QuestionGenerationRequest):
+    try:
+        print(f"Received question generation request for job: {request.job_title}")
+        print(f"Number of questions requested: {request.num_questions}")
+        print(f"Question types: {request.question_types}")
+        
+        # Define question templates based on job type
+        technical_questions = [
+            {
+                "question": f"Can you walk me through your experience with {skill}?",
+                "type": "technical",
+                "focus": "technical expertise"
+            } for skill in request.required_skills[:2]  # Use first 2 required skills
+        ]
+        
+        behavioral_questions = [
+            {
+                "question": "Tell me about a challenging project you worked on and how you handled it.",
+                "type": "behavioral",
+                "focus": "problem-solving and project management"
+            },
+            {
+                "question": "Describe a situation where you had to work with a difficult team member.",
+                "type": "behavioral",
+                "focus": "teamwork and conflict resolution"
+            }
+        ]
+        
+        situational_questions = [
+            {
+                "question": f"How would you approach a situation where you need to implement {request.required_skills[0]} in a tight deadline?",
+                "type": "situational",
+                "focus": "time management and technical implementation"
+            },
+            {
+                "question": "What would you do if you discovered a critical bug in production?",
+                "type": "situational",
+                "focus": "crisis management and debugging"
+            }
+        ]
+        
+        # Combine questions based on requested types
+        all_questions = []
+        if "technical" in request.question_types:
+            all_questions.extend(technical_questions)
+        if "behavioral" in request.question_types:
+            all_questions.extend(behavioral_questions)
+        if "situational" in request.question_types:
+            all_questions.extend(situational_questions)
+            
+        # Ensure we have enough questions
+        while len(all_questions) < request.num_questions:
+            all_questions.extend([
+                {
+                    "question": "Tell me about yourself and your experience.",
+                    "type": "behavioral",
+                    "focus": "self-introduction and experience overview"
+                },
+                {
+                    "question": "What are your greatest strengths?",
+                    "type": "behavioral",
+                    "focus": "self-awareness and key competencies"
+                },
+                {
+                    "question": "Why do you want to work for this company?",
+                    "type": "situational",
+                    "focus": "motivation and company fit"
+                }
+            ])
+            
+        # Return only the requested number of questions
+        return {
+            "questions": all_questions[:request.num_questions]
+        }
+            
+    except Exception as e:
+        print(f"Error in generate_questions: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

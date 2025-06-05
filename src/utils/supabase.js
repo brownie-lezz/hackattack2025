@@ -5,11 +5,15 @@ const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
 const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 // Debug logging during development
+console.log('Environment variables:', {
+  url: supabaseUrl,
+  key: supabaseAnonKey ? 'Key exists' : 'Key missing'
+});
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase configuration missing:', {
-    url: supabaseUrl ? 'Found' : 'Missing',
-    key: supabaseAnonKey ? 'Found' : 'Missing',
-  });
+  throw new Error(
+    'Missing Supabase environment variables. Please check your .env file and ensure REACT_APP_SUPABASE_URL and REACT_APP_SUPABASE_ANON_KEY are set.'
+  );
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey)

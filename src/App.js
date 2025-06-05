@@ -44,6 +44,7 @@ import ResumeRanking from "./components/ResumeRanking/ResumeRanking";
 // import ResumeBuilder from "./pages/resume/ResumeBuilder";
 import Letter from "./pages/cover_letter/Letter";
 import ResumeScreeningDashboard from './components/ResumeScreening/ResumeScreeningDashboard';
+import AIExamination from './pages/ai-examination/AIExamination';
 import Footer from "./components/Footer";
 
 const theme = createTheme({
@@ -141,7 +142,8 @@ const App = () => (
             element={<ResumeRanking />}
           />
           <Route exact path="/cover-letter" element={<Letter />} />
-          <Route path="/resume-screening" element={<ResumeScreening />} />
+          <Route path="/resume-screening" element={<ResumeScreeningDashboard />} />
+          <Route path="/jobs/:id/ai-examination" element={<AIExamination />} />
         </Routes>
         <Footer />
       </AuthProvider>

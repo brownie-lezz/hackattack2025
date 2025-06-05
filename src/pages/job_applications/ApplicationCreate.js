@@ -1,5 +1,5 @@
 import { useState, useContext } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { Formik, Form } from "formik";
 import * as Yup from "yup";
 
@@ -35,82 +35,70 @@ const ApplicationCreate = () => {
   };
 
   return (
-    <>
-      <div className="container">
-        <div className="row h-100">
-          <div className="col-sm-12 col-md-8 mx-auto mb-2">
-            <div className="card">
-              <div className="card-body">
-                <h2 className="text-center mb-3 page-title">Apply</h2>
-                {/* Pass initial values, validation and submit funciton */}
-                <Formik
-                  initialValues={{
-                    name: user ? user.name : "",
-                    email: user ? user.email : "",
-                    phone_number: "",
-                    message: "",
-                  }}
-                  validationSchema={Yup.object({
-                    name: Yup.string().required("Required"),
-                    email: Yup.string()
-                      .email("Invalid email")
-                      .required("Required"),
-                    phoneNumber: Yup.number(),
-                    message: Yup.string(),
-                  })}
-                  onSubmit={(formData) => {
-                    handleSubmit(formData);
-                  }}
-                >
+    <div className="container-fluid py-5 px-5">
+      <div className="row">
+        <div className="col-lg-8 mx-auto">
+          <div className="card shadow">
+            <div className="card-body p-5">
+              <h2 className="page-title mb-4">Apply for Job</h2>
+              <Formik
+                initialValues={{
+                  phone_number: "",
+                  message: "",
+                }}
+                validationSchema={Yup.object({
+                  phone_number: Yup.string().required("Required"),
+                  message: Yup.string().required("Required"),
+                })}
+                onSubmit={handleSubmit}
+              >
+                {({ isSubmitting }) => (
                   <Form>
-                    <MyFloatingTextInput
-                      label="Name"
-                      name="name"
-                      type="text"
-                      placeholder="Enter your name"
-                      required
-                    />
-                    <MyFloatingTextInput
-                      label="Email Address"
-                      name="email"
-                      type="email"
-                      placeholder="name@example.com"
-                      required
-                    />
                     <MyFloatingTextInput
                       label="Phone Number"
                       name="phone_number"
-                      type="number"
-                      placeholder="Enter your phone number"
+                      type="tel"
                     />
-
                     <MyFloatingTextArea
                       label="Message"
                       name="message"
-                      type="text"
-                      placeholder="Enter your message"
+                      rows="4"
                     />
-
                     <div className="mb-3">
-                      <label htmlFor="resume">Resume / Cover Letter</label>
+                      <label htmlFor="resume" className="form-label">
+                        Resume
+                      </label>
                       <input
                         type="file"
                         className="form-control"
                         id="resume"
                         onChange={(e) => setResume(e.target.files[0])}
+                        accept=".pdf,.doc,.docx"
                       />
                     </div>
-                    <button type="submit" className="btn btn-primary">
-                      Apply
-                    </button>
+                    <div className="d-flex justify-content-between">
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-lg"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Submitting..." : "Submit Application"}
+                      </button>
+                      <Link
+                        to={`/jobs/${id}/ai-examination`}
+                        className="btn btn-success btn-lg"
+                      >
+                        Take AI Examination
+                      </Link>
+                    </div>
                   </Form>
-                </Formik>
-              </div>
+                )}
+              </Formik>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

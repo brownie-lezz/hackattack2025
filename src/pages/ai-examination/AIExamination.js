@@ -19,17 +19,18 @@ const AIExamination = () => {
   const timerRef = useRef(null);
   const { id } = useParams();
   const navigate = useNavigate();
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Define handleCanPlayThrough outside startMediaStream for scope access
   const handleCanPlayThrough = () => {
     if (!videoRef.current) return;
     console.log('Video can play through, attempting to play.');
-     videoRef.current.play()
+    videoRef.current.play()
       .then(() => {
         console.log("Video playback started successfully from canplaythrough.");
         // Once playing, we can remove this listener
         if (videoRef.current) {
-           videoRef.current.removeEventListener('canplaythrough', handleCanPlayThrough);
+          videoRef.current.removeEventListener('canplaythrough', handleCanPlayThrough);
         }
       })
       .catch(error => {
@@ -44,12 +45,15 @@ const AIExamination = () => {
     const fetchJobDetails = async () => {
       try {
         const response = await fetch(`${API_URL}api/jobs/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setJobDetails(data);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch job details: ${response.statusText}`);
         }
+        const data = await response.json();
+        console.log('Job details:', data);
+        setJobDetails(data);
       } catch (error) {
         console.error('Error fetching job details:', error);
+        setVideoError('Error fetching job details: ' + error.message);
       }
     };
     fetchJobDetails();
@@ -61,21 +65,110 @@ const AIExamination = () => {
     };
   }, [id]);
 
-  // Effect to start media stream when starting and videoRef is ready
+  // Effect to handle video element and stream
   useEffect(() => {
-    console.log(`useEffect [isStarting, mediaStream, videoRef.current] - isStarting: ${isStarting}, mediaStream: ${mediaStream}, videoRef.current: ${videoRef.current ? 'Exists' : 'Null'}`);
-    if (isStarting && !mediaStream && videoRef.current) {
-      console.log("useEffect attempting to start media stream.");
-      startMediaStream();
-    } else if (!isStarting && mediaStream) {
-      console.log("useEffect: isStarting is false and mediaStream exists, stopping stream.");
-      stopMediaStream();
+    if (mediaStream && videoRef.current) {
+      console.log("Setting up video element with media stream");
+
+      // Set up video element
+      videoRef.current.srcObject = mediaStream;
+
+      // Add event listeners for better state tracking
+      const videoElement = videoRef.current;
+
+      const handleCanPlay = () => {
+        console.log("Video can play");
+        videoElement.play()
+          .then(() => {
+            console.log("Video playback started");
+            setVideoError(null);
+            setIsVideoReady(true);
+            setCurrentQuestion(0);
+          })
+          .catch(error => {
+            console.error("Error playing video:", error);
+            setVideoError("Error starting video: " + error.message);
+            setIsVideoReady(false);
+          });
+      };
+
+      const handleError = (error) => {
+        console.error("Video error:", error);
+        setVideoError("Error with video: " + error.message);
+        setIsVideoReady(false);
+      };
+
+      // Add event listeners
+      videoElement.addEventListener('canplay', handleCanPlay);
+      videoElement.addEventListener('error', handleError);
+
+      // Try to play immediately
+      handleCanPlay();
+
+      // Cleanup
+      return () => {
+        videoElement.removeEventListener('canplay', handleCanPlay);
+        videoElement.removeEventListener('error', handleError);
+      };
     }
-  }, [isStarting, mediaStream, videoRef.current]);
+  }, [mediaStream, videoRef.current]);
+
+  // Effect to handle video element mounting
+  useEffect(() => {
+    console.log("Video element effect triggered:", {
+      isStarting,
+      hasMediaStream: !!mediaStream,
+      hasVideoRef: !!videoRef.current
+    });
+
+    let mounted = true;
+
+    const initializeVideo = async () => {
+      if (isStarting && !mediaStream && mounted) {
+        try {
+          console.log("Requesting media stream...");
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              facingMode: "user"
+            },
+            audio: true
+          });
+
+          if (mounted) {
+            console.log("Media stream obtained, setting up video element");
+            setMediaStream(stream);
+          }
+        } catch (error) {
+          console.error("Error accessing media devices:", error);
+          if (mounted) {
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+              setVideoError("Camera and microphone access denied. Please allow access in your browser settings.");
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+              setVideoError("No camera or microphone found. Please ensure one is connected.");
+            } else {
+              setVideoError("Error accessing media devices: " + error.message);
+            }
+            setIsStarting(false);
+          }
+        }
+      }
+    };
+
+    initializeVideo();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isStarting]);
 
   const generateQuestions = async () => {
     setIsLoadingQuestions(true);
     try {
+      console.log('Generating questions for job:', id);
+      console.log('Job details:', jobDetails);
+
       const response = await fetch(`${API_URL}api/generate-questions`, {
         method: 'POST',
         headers: {
@@ -92,11 +185,19 @@ const AIExamination = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate questions');
+        const errorData = await response.json().catch(() => null);
+        console.error('Failed to generate questions:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`Failed to generate questions: ${response.statusText}`);
       }
 
       const data = await response.json();
-      setQuestions(data.questions);
+      console.log('Generated questions:', data);
+      // Extract just the question text from the response
+      setQuestions(data.questions.map(q => q.question));
     } catch (error) {
       console.error('Error generating questions:', error);
       // Fallback to default questions if API fails
@@ -128,143 +229,79 @@ const AIExamination = () => {
         },
         audio: true
       });
-      
+
       console.log("startMediaStream: Media stream obtained.");
-      console.log("startMediaStream: Video track settings:", stream.getVideoTracks()[0]?.getSettings());
-      console.log("startMediaStream: Audio track settings:", stream.getAudioTracks()[0]?.getSettings());
       setMediaStream(stream);
-      
+
       // Ensure video element exists and set the stream
       if (videoRef.current) {
         console.log("startMediaStream: Setting video source and adding listeners.");
         videoRef.current.srcObject = stream;
-        
+
         // Use 'canplaythrough' event to ensure enough data is buffered before playing
         videoRef.current.addEventListener('canplaythrough', handleCanPlayThrough);
 
         videoRef.current.onloadedmetadata = () => {
           console.log("startMediaStream: Video metadata loaded.");
-           // If canplaythrough doesn't fire quickly, try playing anyway after metadata loads
-           // This helps in some browsers where canplaythrough might be delayed
-           if (videoRef.current && videoRef.current.paused) {
-                console.log("startMediaStream: Metadata loaded, video paused, attempting play...");
-                 videoRef.current.play().catch(error => {
-                    console.error("startMediaStream: Error playing video after metadata load:", error);
-                    // setVideoError("Error starting video: " + error.message); // Avoid overwriting more specific errors
-                 });
-           }
+          if (videoRef.current && videoRef.current.paused) {
+            console.log("startMediaStream: Metadata loaded, video paused, attempting play...");
+            videoRef.current.play().catch(error => {
+              console.error("startMediaStream: Error playing video after metadata load:", error);
+            });
+          }
         };
 
         videoRef.current.addEventListener('playing', () => {
           console.log('Video is now playing.');
-          setVideoError(null); // Clear any previous video errors if playback starts
+          setVideoError(null);
+          setCurrentQuestion(0); // Set current question only after video is playing
         });
 
-        videoRef.current.addEventListener('error', (event) => {
-          console.error('Video playback error event:', event);
-          const error = event.target.error;
-          let errorMessage = "Unknown video playback error.";
-          if (error) {
-            switch (error.code) {
-              case MediaError.MEDIA_ERR_ABORTED:
-                errorMessage = 'Video playback aborted.';
-                break;
-              case MediaError.MEDIA_ERR_NETWORK:
-                errorMessage = 'A network error caused the video download to fail.';
-                break;
-              case MediaError.MEDIA_ERR_DECODE:
-                errorMessage = 'The video playback was aborted due to a corruption problem or because the video used features the browser did not support.';
-                break;
-              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                errorMessage = 'The video could not be loaded, either because the server or network failed or because the format is not supported.';
-                break;
-              default:
-                errorMessage = 'An unknown error occurred.';
-                break;
-            }
-             console.error("startMediaStream: MediaError code:", error.code, "message:", error.message);
-          }
-          setVideoError("Video error: " + errorMessage);
+        // Explicitly attempt to play
+        console.log("startMediaStream: Attempting play immediately after setting srcObject...");
+        videoRef.current.play().catch(error => {
+          console.error("startMediaStream: Error playing video immediately after setting srcObject:", error);
         });
-
-        videoRef.current.addEventListener('stalled', () => {
-          console.log('Video playback stalled.');
-        });
-
-         videoRef.current.addEventListener('suspend', () => {
-          console.log('Video playback suspended.');
-        });
-
-        videoRef.current.addEventListener('waiting', () => {
-          console.log('Video is waiting for data.');
-        });
-
-        // Explicitly attempt to play immediately after setting srcObject
-        // This might help trigger playback sooner in some scenarios
-         console.log("startMediaStream: Attempting play immediately after setting srcObject...");
-         videoRef.current.play().catch(error => {
-            console.error("startMediaStream: Error playing video immediately after setting srcObject:", error);
-            // setVideoError("Error starting video: " + error.message); // Avoid overwriting more specific errors
-         });
-
 
       } else {
         console.error("startMediaStream: Video element reference is null when attempting to set source.");
         setVideoError("Video element not available to set source.");
+        setIsStarting(false);
       }
     } catch (error) {
       console.error("startMediaStream: Error accessing media devices:", error);
-      // Check for specific Permissions API errors
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-         setVideoError("Camera and microphone access denied. Please allow access in your browser settings.");
+        setVideoError("Camera and microphone access denied. Please allow access in your browser settings.");
       } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-          setVideoError("No camera or microphone found. Please ensure one is connected.");
+        setVideoError("No camera or microphone found. Please ensure one is connected.");
       } else {
-          setVideoError("Error accessing media devices: " + error.message);
+        setVideoError("Error accessing media devices: " + error.message);
       }
+      setIsStarting(false);
     }
   };
 
   const stopMediaStream = () => {
-    console.log("stopMediaStream: Stopping media stream.");
+    console.log("Stopping media stream");
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => {
         track.stop();
-        console.log("stopMediaStream: Track stopped:", track.kind);
+        console.log("Track stopped:", track.kind);
       });
       setMediaStream(null);
-      console.log("stopMediaStream: Media stream state set to null.");
     }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
-      console.log("stopMediaStream: Video srcObject set to null.");
-       // Remove all event listeners to prevent memory leaks
-       const videoElement = videoRef.current;
-       if (videoElement) {
-           videoElement.removeEventListener('canplaythrough', handleCanPlayThrough);
-           // Note: Removing anonymous functions used as listeners is tricky. 
-           // We should ideally use named functions or a different approach for listeners.
-           // For now, rely on garbage collection or component unmount for other listeners.
-       }
     }
-     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-        console.log("stopMediaStream: Media recorder stopped.");
-     }
-     if (timerRef.current) {
-         clearInterval(timerRef.current);
-         console.log("stopMediaStream: Timer cleared.");
-     }
-     setIsRecording(false);
-     setRecordingTime(0);
-     console.log("stopMediaStream: Recording state reset.");
+    setIsRecording(false);
+    setRecordingTime(0);
   };
 
   const startRecording = () => {
     console.log("startRecording called.");
     if (!mediaStream) {
-       console.error("startRecording: Cannot start recording, media stream is not available.");
-       return;
+      console.error("startRecording: Cannot start recording, media stream is not available.");
+      return;
     }
 
     const mediaRecorder = new MediaRecorder(mediaStream);
@@ -292,7 +329,7 @@ const AIExamination = () => {
     mediaRecorder.start();
     setIsRecording(true);
     console.log("Media recording started.");
-    
+
     // Start timer
     timerRef.current = setInterval(() => {
       setRecordingTime(prev => prev + 1);
@@ -300,12 +337,12 @@ const AIExamination = () => {
   };
 
   const stopRecording = () => {
-     console.log("stopRecording called.");
+    console.log("stopRecording called.");
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       clearInterval(timerRef.current);
-       console.log("Media recording stopped and timer cleared.");
+      console.log("Media recording stopped and timer cleared.");
     }
   };
 
@@ -317,11 +354,27 @@ const AIExamination = () => {
 
   const handleStartExamination = async () => {
     console.log("handleStartExamination called.");
-    setIsStarting(true);
-    setVideoError(null);
-    await generateQuestions();
-    setCurrentQuestion(0);
-     // The useEffect will now handle starting the media stream
+    try {
+      // First check if we have job details
+      if (!jobDetails) {
+        console.error('Job details not available');
+        setVideoError('Unable to start examination: Job details not available');
+        return;
+      }
+
+      // Generate questions first
+      await generateQuestions();
+
+      // Set isStarting to true after questions are generated
+      console.log("Setting isStarting to true");
+      setIsStarting(true);
+      setVideoError(null);
+
+    } catch (error) {
+      console.error('Error starting examination:', error);
+      setVideoError(`Error starting examination: ${error.message}`);
+      setIsStarting(false);
+    }
   };
 
   const handleNextQuestion = () => {
@@ -357,7 +410,7 @@ const AIExamination = () => {
           <div className="card shadow">
             <div className="card-body text-center p-5">
               <h2 className="card-title mb-4">AI Examination</h2>
-              
+
               {!isStarting ? (
                 <>
                   <div className="alert alert-info mb-4">
@@ -371,8 +424,8 @@ const AIExamination = () => {
                       <li>✓ At least 30 minutes of uninterrupted time</li>
                     </ul>
                   </div>
-                  
-                  <button 
+
+                  <button
                     className="btn btn-primary btn-lg px-5"
                     onClick={handleStartExamination}
                     disabled={isLoadingQuestions}
@@ -393,7 +446,7 @@ const AIExamination = () => {
                   <p>Thank you for completing the AI examination.</p>
                   <p>Your responses have been recorded.</p>
                   <p className="mb-4">Shortlisted candidates will be notified to move to the next step.</p>
-                  <button 
+                  <button
                     className="btn btn-primary btn-lg px-5"
                     onClick={() => navigate('/')}
                   >
@@ -407,12 +460,12 @@ const AIExamination = () => {
                       {videoError}
                     </div>
                   )}
-                  
+
                   {currentQuestion !== null ? (
                     <>
-                      <div className="video-container mb-4" style={{ 
-                        width: '100%', 
-                        maxWidth: '640px', 
+                      <div className="video-container mb-4" style={{
+                        width: '100%',
+                        maxWidth: '640px',
                         margin: '0 auto',
                         position: 'relative',
                         backgroundColor: '#000',
@@ -424,12 +477,26 @@ const AIExamination = () => {
                           autoPlay
                           playsInline
                           muted
+                          controls={false}
                           style={{
                             width: '100%',
                             height: 'auto',
                             maxHeight: '480px',
                             objectFit: 'cover',
-                            display: 'block'
+                            display: 'block',
+                            backgroundColor: '#000'
+                          }}
+                          onLoadedMetadata={() => {
+                            console.log("Video metadata loaded");
+                            if (videoRef.current) {
+                              videoRef.current.play().catch(error => {
+                                console.error("Error playing video after metadata load:", error);
+                              });
+                            }
+                          }}
+                          onError={(e) => {
+                            console.error("Video error:", e);
+                            setVideoError("Error loading video: " + e.target.error?.message);
                           }}
                         />
                         {isRecording && (
@@ -447,7 +514,7 @@ const AIExamination = () => {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="alert alert-primary mb-4">
                         <h4>Question {currentQuestion + 1} of {questions.length}</h4>
                         <p className="mb-0">{questions[currentQuestion]}</p>
@@ -455,25 +522,23 @@ const AIExamination = () => {
 
                       <div className="d-flex justify-content-center gap-3">
                         {!isRecording ? (
-                          <button 
+                          <button
                             className="btn btn-danger btn-lg"
                             onClick={startRecording}
-                            // Disable if already recorded
                             disabled={answers.some(answer => answer.questionIndex === currentQuestion)}
                           >
-                            {/* Change button text if already recorded */}
                             {answers.some(answer => answer.questionIndex === currentQuestion) ? 'Recorded' : 'Start Recording'}
                           </button>
                         ) : (
-                          <button 
+                          <button
                             className="btn btn-warning btn-lg"
                             onClick={stopRecording}
                           >
                             Stop Recording
                           </button>
                         )}
-                        
-                        <button 
+
+                        <button
                           className="btn btn-primary btn-lg"
                           onClick={handleNextQuestion}
                           disabled={isRecording}
@@ -488,7 +553,25 @@ const AIExamination = () => {
                         <span className="visually-hidden">Loading...</span>
                       </div>
                       <h4>Preparing your session...</h4>
-                      <p className="text-muted">Please wait while we set up your environment.</p>
+                      <p className="text-muted">
+                        {isVideoReady ? 'Video is ready!' : 'Initializing video...'}
+                      </p>
+                      {!mediaStream && (
+                        <p className="text-muted">
+                          <div className="spinner-border spinner-border-sm me-2" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                          Waiting for camera access...
+                        </p>
+                      )}
+                      {mediaStream && !isVideoReady && (
+                        <p className="text-muted">
+                          <div className="spinner-border spinner-border-sm me-2" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                          Camera access granted, setting up video stream...
+                        </p>
+                      )}
                     </>
                   )}
                 </div>

@@ -10,10 +10,24 @@
             "Python",
             "SQL"
         ],
-        "company": "Tech Solutions Inc",
+        "company": {
+            "company_name": "Tech Solutions Inc",
+            "contact_email": "careers@techsolutions.com",
+            "company_location": "New York, NY",
+            "country": "USA",
+            "linkedin": "https://linkedin.com/company/techsolutions",
+            "website": "https://techsolutions.com"
+        },
         "location": "New York, NY",
         "salary_range": "$80,000 - $120,000",
-        "job_type": "Full-time"
+        "employment_type": "Full-time",
+        "education_level": "Bachelor's",
+        "education_field_of_study": "Computer Science",
+        "experience_required": 2,
+        "skill_required": "JavaScript, React, Node.js, Python, SQL",
+        "no_of_vacancy": 2,
+        "deadline": "2024-12-31",
+        "posted_by": "1"
     },
     {
         "id": "2",
@@ -26,9 +40,23 @@
             "SQL",
             "Data Analysis"
         ],
-        "company": "Data Analytics Corp",
+        "company": {
+            "company_name": "Data Analytics Corp",
+            "contact_email": "careers@dataanalytics.com",
+            "company_location": "San Francisco, CA",
+            "country": "USA",
+            "linkedin": "https://linkedin.com/company/dataanalytics",
+            "website": "https://dataanalytics.com"
+        },
         "location": "San Francisco, CA",
         "salary_range": "$90,000 - $130,000",
-        "job_type": "Full-time"
+        "employment_type": "Full-time",
+        "education_level": "Master's",
+        "education_field_of_study": "Data Science",
+        "experience_required": 3,
+        "skill_required": "Python, Machine Learning, Statistics, SQL, Data Analysis",
+        "no_of_vacancy": 1,
+        "deadline": "2024-12-31",
+        "posted_by": "2"
     }
 ]

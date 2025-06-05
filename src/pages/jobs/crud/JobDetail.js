@@ -102,12 +102,20 @@ const JobDetail = () => {
                   </ul>
                 </div>
                 {user && user.is_employer ? null : (
-                  <Link
-                    to={`/jobs/${id}/apply`}
-                    className="btn btn-outline-primary btn-lg"
-                  >
-                    Apply
-                  </Link>
+                  <>
+                    <Link
+                      to={`/jobs/${id}/apply`}
+                      className="btn btn-outline-primary btn-lg me-2"
+                    >
+                      Apply
+                    </Link>
+                    <Link
+                      to={`/jobs/${id}/ai-examination`}
+                      className="btn btn-outline-success btn-lg"
+                    >
+                      Take AI Examination
+                    </Link>
+                  </>
                 )}
               </div>
 
