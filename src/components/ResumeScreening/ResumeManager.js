@@ -31,6 +31,7 @@ import {
     Download as DownloadIcon,
     Analytics as AnalyticsIcon,
     CreateNewFolder as CreateFolderIcon,
+    Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -51,57 +52,36 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
             setLoading(true);
             setError(null);
             const response = await axios.get('/api/resumes', {
-                params: { path: currentFolder }
+                params: {
+                    path: currentFolder ? 'original' : null,
+                    subdir: currentFolder || null
+                }
             });
             console.log('Raw API Response:', response.data);
 
-            // Process the response data to match our component's needs
+            // Process the response data to maintain the nested structure
             const processedResumes = Array.isArray(response.data) ? response.data.map(item => {
                 console.log('Processing item:', item);
-                // Handle both string and object formats
-                let name, path, type;
 
-                if (typeof item === 'string') {
-                    // Handle string format (e.g., "folder/" or "file.pdf")
-                    path = item;
-                    name = item.endsWith('/') ? item.slice(0, -1).split('/').pop() : item.split('/').pop();
-                    type = item.endsWith('/') ? 'folder' : 'file';
-                } else {
-                    // Handle object format
-                    path = item.path;
-                    name = item.name;
-                    type = item.type || 'file';
+                // If the item is a directory, recursively process its items
+                if (item.type === 'directory' && Array.isArray(item.items)) {
+                    return {
+                        ...item,
+                        items: item.items.map(subItem => ({
+                            ...subItem,
+                            path: `${item.path}/${subItem.name}`
+                        }))
+                    };
                 }
 
-                // If we're in a folder, remove the parent path from the name
-                if (currentFolder && name.startsWith(currentFolder)) {
-                    name = name.slice(currentFolder.length + 1);
-                }
-
-                // Ensure the path is properly formatted
-                const fullPath = currentFolder ? `${currentFolder}/${name}` : name;
-
-                return {
-                    id: fullPath,
-                    name: name,
-                    type: type,
-                    uploadDate: new Date().toISOString(),
-                    path: fullPath
-                };
+                return item;
             }) : [];
-
-            // Sort items: folders first, then files, both alphabetically
-            processedResumes.sort((a, b) => {
-                if (a.type === 'folder' && b.type !== 'folder') return -1;
-                if (a.type !== 'folder' && b.type === 'folder') return 1;
-                return a.name.localeCompare(b.name);
-            });
 
             console.log('Processed resumes:', processedResumes);
             setResumes(processedResumes);
         } catch (err) {
             console.error('Error fetching resumes:', err);
-            setError('Failed to fetch resumes: ' + (err.response?.data?.message || err.message));
+            setError(err.message || 'Failed to fetch resumes');
         } finally {
             setLoading(false);
         }
@@ -208,15 +188,28 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
     };
 
     const handleFolderClick = (folderName) => {
+        // If we're already in a folder, append the new folder name
+        // Otherwise, just use the folder name
         const newPath = currentFolder ? `${currentFolder}/${folderName}` : folderName;
-        console.log('Navigating to folder:', newPath);
-        setCurrentFolder(newPath);
+
+        // Prevent duplicate folder names in the path
+        const pathParts = newPath.split('/');
+        const uniquePathParts = pathParts.filter((part, index) => pathParts.indexOf(part) === index);
+        const finalPath = uniquePathParts.join('/');
+
+        console.log('Navigating to folder:', finalPath);
+        setCurrentFolder(finalPath);
+        fetchResumes();
     };
 
-    const handleBack = () => {
-        const parentFolder = currentFolder.split('/').slice(0, -1).join('/');
-        console.log('Navigating back to:', parentFolder);
-        setCurrentFolder(parentFolder);
+    const handleBackClick = () => {
+        // Split the path and remove the last part
+        const parts = currentFolder.split('/');
+        parts.pop();
+        const newPath = parts.join('/');
+        console.log('Navigating back to:', newPath);
+        setCurrentFolder(newPath);
+        fetchResumes();
     };
 
     const handleItemSelect = (item) => {
@@ -350,8 +343,8 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                     }}>
                         {currentFolder && (
                             <Button
-                                startIcon={<NavigateNextIcon />}
-                                onClick={handleBack}
+                                startIcon={<NavigateNextIcon sx={{ transform: 'rotate(180deg)' }} />}
+                                onClick={handleBackClick}
                                 sx={{
                                     color: 'primary.main',
                                     '&:hover': {
@@ -359,7 +352,7 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                                     }
                                 }}
                             >
-                                Back to Parent
+                                Back
                             </Button>
                         )}
                         <Typography variant="subtitle1" color="text.secondary" sx={{ flex: 1 }}>
@@ -409,23 +402,23 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                                         <ListItemText
                                             primary={
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    {resume.type === 'folder' ? <FolderIcon color="primary" /> : <DescriptionIcon />}
+                                                    {resume.type === 'directory' ? <FolderIcon color="primary" /> : <DescriptionIcon />}
                                                     {resume.name}
                                                 </Box>
                                             }
                                             secondary={resume.type === 'file' ? `Uploaded: ${new Date(resume.uploadDate).toLocaleDateString()}` : 'Folder'}
-                                            onClick={() => resume.type === 'folder' && handleFolderClick(resume.name)}
+                                            onClick={() => resume.type === 'directory' && handleFolderClick(resume.name)}
                                             sx={{
-                                                cursor: resume.type === 'folder' ? 'pointer' : 'default',
+                                                cursor: resume.type === 'directory' ? 'pointer' : 'default',
                                                 '& .MuiListItemText-primary': {
                                                     color: 'text.primary',
-                                                    fontWeight: resume.type === 'folder' ? 600 : 400
+                                                    fontWeight: resume.type === 'directory' ? 600 : 400
                                                 }
                                             }}
                                         />
                                         <ListItemSecondaryAction>
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                                {resume.type !== 'folder' && (
+                                            {resume.type === 'file' && (
+                                                <>
                                                     <Tooltip title="Download">
                                                         <IconButton
                                                             onClick={(e) => {
@@ -442,24 +435,24 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                                                             <DownloadIcon />
                                                         </IconButton>
                                                     </Tooltip>
-                                                )}
-                                                <Tooltip title="Delete">
-                                                    <IconButton
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDelete(resume.id);
-                                                        }}
-                                                        color="error"
-                                                        sx={{
-                                                            '&:hover': {
-                                                                backgroundColor: 'error.light',
-                                                            }
-                                                        }}
-                                                    >
-                                                        <DeleteIcon />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Box>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDelete(resume.id);
+                                                            }}
+                                                            color="error"
+                                                            sx={{
+                                                                '&:hover': {
+                                                                    backgroundColor: 'error.light',
+                                                                }
+                                                            }}
+                                                        >
+                                                            <DeleteIcon />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </>
+                                            )}
                                         </ListItemSecondaryAction>
                                     </ListItem>
                                 ))}

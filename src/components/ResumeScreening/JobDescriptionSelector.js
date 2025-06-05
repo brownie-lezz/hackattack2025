@@ -4,32 +4,117 @@ import {
     Typography,
     TextField,
     Button,
-    Alert,
-    CircularProgress,
+    MenuItem,
+    Select,
+    FormControl,
+    InputLabel,
+    Stack,
     Paper,
     IconButton,
     Tooltip,
+    useTheme,
     Dialog,
     DialogTitle,
     DialogContent,
-    DialogActions
+    DialogActions,
+    Alert,
+    CircularProgress,
 } from '@mui/material';
 import {
-    Description as DescriptionIcon,
     Add as AddIcon,
+    Delete as DeleteIcon,
     Save as SaveIcon,
-    Delete as DeleteIcon
+    Work as WorkIcon,
+    Description as DescriptionIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
 const JobDescriptionSelector = ({ onJobSelect }) => {
+    const theme = useTheme();
+    const [jobDescription, setJobDescription] = useState('');
+    const [selectedTemplate, setSelectedTemplate] = useState('');
+    const [showTemplates, setShowTemplates] = useState(false);
     const [jobDescriptions, setJobDescriptions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedJob, setSelectedJob] = useState('');
     const [showNewJobDialog, setShowNewJobDialog] = useState(false);
     const [newJobTitle, setNewJobTitle] = useState('');
     const [newJobDescription, setNewJobDescription] = useState('');
+    const [selectedJobId, setSelectedJobId] = useState('');
+
+    const jobTemplates = [
+        {
+            id: 'software-engineer',
+            title: 'Software Engineer',
+            description: `Requirements:
+• Bachelor's degree in Computer Science or related field
+• 3+ years of experience in software development
+• Strong proficiency in JavaScript, Python, or Java
+• Experience with modern frameworks (React, Node.js, Django)
+• Knowledge of database systems and SQL
+• Understanding of software design patterns and principles
+• Experience with version control systems (Git)
+• Strong problem-solving and analytical skills
+• Excellent communication and teamwork abilities
+
+Responsibilities:
+• Design and develop high-quality software solutions
+• Write clean, maintainable, and efficient code
+• Collaborate with cross-functional teams
+• Participate in code reviews and technical discussions
+• Debug and resolve technical issues
+• Stay updated with emerging technologies
+• Contribute to technical documentation
+• Mentor junior developers`
+        },
+        {
+            id: 'data-scientist',
+            title: 'Data Scientist',
+            description: `Requirements:
+• Master's or PhD in Statistics, Mathematics, Computer Science, or related field
+• 2+ years of experience in data science or machine learning
+• Strong programming skills in Python or R
+• Experience with data analysis and visualization tools
+• Knowledge of machine learning algorithms and statistical methods
+• Experience with big data technologies (Hadoop, Spark)
+• Strong analytical and problem-solving skills
+• Excellent communication and presentation abilities
+
+Responsibilities:
+• Develop and implement machine learning models
+• Analyze large datasets to extract insights
+• Create data-driven solutions for business problems
+• Collaborate with stakeholders to understand requirements
+• Present findings and recommendations to non-technical audiences
+• Stay current with latest data science trends and technologies
+• Document methodologies and results
+• Mentor junior data scientists`
+        },
+        {
+            id: 'product-manager',
+            title: 'Product Manager',
+            description: `Requirements:
+• Bachelor's degree in Business, Computer Science, or related field
+• 3+ years of product management experience
+• Strong understanding of product development lifecycle
+• Experience with agile methodologies
+• Excellent analytical and problem-solving skills
+• Strong communication and leadership abilities
+• Experience with product analytics tools
+• Understanding of user experience principles
+
+Responsibilities:
+• Define product vision and strategy
+• Gather and prioritize product requirements
+• Work closely with development teams
+• Conduct market research and competitive analysis
+• Create product roadmaps and timelines
+• Monitor product performance and metrics
+• Gather and analyze user feedback
+• Coordinate with cross-functional teams
+• Present product updates to stakeholders`
+        }
+    ];
 
     useEffect(() => {
         fetchJobDescriptions();
@@ -40,33 +125,36 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
             setLoading(true);
             setError(null);
             const response = await axios.get('/api/job-descriptions');
+            console.log('Fetched job descriptions:', response.data);
             setJobDescriptions(response.data);
         } catch (err) {
+            console.error('Error fetching job descriptions:', err);
             setError('Failed to fetch job descriptions: ' + err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleJobSelect = (job) => {
-        console.log('Current selected job:', selectedJob);
-        console.log('Clicked job:', job);
+    const handleJobSelect = (jobId) => {
+        console.log('Selecting job:', jobId);
+        const selectedJob = jobDescriptions.find(job => job.id === jobId);
+        console.log('Selected job:', selectedJob);
 
-        // If clicking the same job, deselect it
-        if (selectedJob === job) {
-            console.log('Deselecting job');
-            setSelectedJob('');
-            onJobSelect('');
+        if (selectedJob) {
+            setSelectedJobId(jobId);
+            const jobContent = selectedJob.content || selectedJob.description || '';
+            console.log('Job content to display:', jobContent);
+            setJobDescription(jobContent);
+            onJobSelect(jobContent);
         } else {
-            // Select the new job
-            console.log('Setting new selection:', job);
-            setSelectedJob(job);
-            onJobSelect(job.content);
+            setSelectedJobId('');
+            setJobDescription('');
+            onJobSelect('');
         }
     };
 
     const handleCreateJob = async () => {
-        if (!newJobTitle.trim() || !newJobDescription.trim()) {
+        if (!newJobTitle?.trim() || !newJobDescription?.trim()) {
             setError('Please fill in both title and description');
             return;
         }
@@ -97,8 +185,8 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
             setError(null);
             await axios.delete(`/api/job-descriptions/${job.id}`);
             setJobDescriptions(jobDescriptions.filter(j => j.id !== job.id));
-            if (selectedJob === job) {
-                setSelectedJob('');
+            if (jobDescription === job.content) {
+                setJobDescription('');
                 onJobSelect('');
             }
         } catch (err) {
@@ -108,164 +196,248 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
         }
     };
 
+    const handleTemplateSelect = (template) => {
+        setSelectedTemplate(template.id);
+        setJobDescription(template.description);
+        onJobSelect(template.description);
+        setShowTemplates(false);
+    };
+
+    const handleSaveTemplate = () => {
+        if (jobDescription?.trim()) {
+            const newTemplate = {
+                id: `custom-${Date.now()}`,
+                title: 'Custom Template',
+                description: jobDescription
+            };
+            jobTemplates.push(newTemplate);
+            setSelectedTemplate(newTemplate.id);
+            setShowTemplates(false);
+        }
+    };
+
+    const handleDeleteTemplate = (templateId) => {
+        const updatedTemplates = jobTemplates.filter(t => t.id !== templateId);
+        if (selectedTemplate === templateId) {
+            setSelectedTemplate('');
+            setJobDescription('');
+            onJobSelect('');
+        }
+    };
+
     return (
-        <Box>
-            <Box sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                mb: 3,
-                p: 2,
-                bgcolor: 'background.paper',
-                borderRadius: 2,
-                boxShadow: 1
-            }}>
-                <Typography variant="h6" sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                    color: 'primary.main',
-                    fontWeight: 600
-                }}>
-                    <DescriptionIcon color="primary" />
-                    Job Description
-                </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setShowNewJobDialog(true)}
-                    sx={{
-                        backgroundColor: 'primary.main',
-                        borderRadius: 2,
-                        px: 3,
-                        py: 1,
-                        '&:hover': {
-                            backgroundColor: 'primary.dark',
-                            transform: 'translateY(-1px)',
-                            boxShadow: 2
-                        },
-                        transition: 'all 0.2s ease-in-out'
-                    }}
-                >
-                    New Job Description
-                </Button>
-            </Box>
+        <Box sx={{ width: '100%' }}>
+            <Stack spacing={2}>
+                {error && (
+                    <Alert severity="error" sx={{ borderRadius: 2 }}>
+                        {error}
+                    </Alert>
+                )}
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                    {error}
-                </Alert>
-            )}
-
-            {loading ? (
-                <Box display="flex" justifyContent="center" p={3}>
-                    <CircularProgress color="primary" />
-                </Box>
-            ) : jobDescriptions.length === 0 ? (
-                <Paper sx={{
-                    p: 4,
-                    textAlign: 'center',
-                    borderRadius: 2,
-                    bgcolor: 'background.paper',
-                    boxShadow: 1
-                }}>
-                    <Typography color="text.secondary" variant="h6" sx={{ mb: 1 }}>
-                        No Job Descriptions Found
-                    </Typography>
-                    <Typography color="text.secondary" variant="body2">
-                        Create a new job description to get started with resume screening.
-                    </Typography>
-                </Paper>
-            ) : (
-                <Box sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2
-                }}>
-                    {jobDescriptions.map((job) => {
-                        const isSelected = selectedJob === job;
-                        console.log(`Rendering job:`, job);
-                        console.log(`Is selected:`, isSelected);
-                        return (
-                            <Paper
-                                key={job.title}
-                                elevation={isSelected ? 3 : 1}
+                {loading ? (
+                    <Box display="flex" justifyContent="center" p={3}>
+                        <CircularProgress color="primary" />
+                    </Box>
+                ) : (
+                    <>
+                        <FormControl fullWidth>
+                            <InputLabel>Select Job Description</InputLabel>
+                            <Select
+                                value={selectedJobId}
+                                onChange={(e) => handleJobSelect(e.target.value)}
+                                label="Select Job Description"
                                 sx={{
-                                    p: 2.5,
-                                    border: '2px solid',
-                                    borderColor: isSelected ? 'primary.main' : 'divider',
+                                    borderRadius: 2,
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'divider',
+                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                        borderColor: 'primary.main',
+                                    },
+                                }}
+                            >
+                                <MenuItem value="">
+                                    <em>Select a job description to analyze</em>
+                                </MenuItem>
+                                {jobDescriptions.map((job) => (
+                                    <MenuItem key={job.id} value={job.id}>
+                                        {job.title}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        <Paper
+                            elevation={0}
+                            sx={{
+                                p: 3,
+                                borderRadius: 2,
+                                bgcolor: 'background.paper',
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                minHeight: '200px',
+                                maxHeight: '400px',
+                                overflow: 'auto',
+                                '&::-webkit-scrollbar': {
+                                    width: '8px',
+                                },
+                                '&::-webkit-scrollbar-track': {
+                                    background: '#f1f1f1',
+                                    borderRadius: '4px',
+                                },
+                                '&::-webkit-scrollbar-thumb': {
+                                    background: '#888',
+                                    borderRadius: '4px',
+                                    '&:hover': {
+                                        background: '#666',
+                                    },
+                                },
+                            }}
+                        >
+                            {jobDescription ? (
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        whiteSpace: 'pre-line',
+                                        lineHeight: 1.6,
+                                        color: 'text.primary',
+                                    }}
+                                >
+                                    {jobDescription}
+                                </Typography>
+                            ) : (
+                                <Box
+                                    sx={{
+                                        height: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <Typography
+                                        variant="body1"
+                                        color="text.secondary"
+                                        sx={{ textAlign: 'center' }}
+                                    >
+                                        Select a job description or use a template to get started
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+
+                        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                            <Button
+                                variant="outlined"
+                                startIcon={<AddIcon />}
+                                onClick={() => setShowNewJobDialog(true)}
+                                sx={{
+                                    borderRadius: 2,
+                                    textTransform: 'none',
+                                    px: 3,
+                                }}
+                            >
+                                Add Job Description
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<AddIcon />}
+                                onClick={() => setShowTemplates(true)}
+                                sx={{
+                                    borderRadius: 2,
+                                    textTransform: 'none',
+                                    px: 3,
+                                }}
+                            >
+                                Browse Templates
+                            </Button>
+                        </Box>
+                    </>
+                )}
+            </Stack>
+
+            {/* Templates Dialog */}
+            <Dialog
+                open={showTemplates}
+                onClose={() => setShowTemplates(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 2,
+                        maxHeight: '90vh',
+                    }
+                }}
+            >
+                <DialogTitle sx={{
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    pb: 2,
+                }}>
+                    <Typography variant="h6">Job Description Templates</Typography>
+                </DialogTitle>
+                <DialogContent sx={{ p: 3 }}>
+                    <Stack spacing={2}>
+                        {jobTemplates.map((template) => (
+                            <Paper
+                                key={template.id}
+                                elevation={1}
+                                sx={{
+                                    p: 2,
                                     borderRadius: 2,
                                     cursor: 'pointer',
                                     '&:hover': {
-                                        borderColor: isSelected ? 'primary.main' : 'divider',
-                                        backgroundColor: isSelected ? 'primary.main' : 'action.hover',
-                                        transform: 'translateY(-2px)',
-                                        boxShadow: isSelected ? 4 : 2,
+                                        bgcolor: 'action.hover',
                                     },
-                                    backgroundColor: isSelected ? 'primary.main' : 'background.paper',
-                                    transition: 'all 0.3s ease-in-out',
-                                    position: 'relative',
-                                    overflow: 'hidden',
                                 }}
-                                onClick={() => handleJobSelect(job)}
+                                onClick={() => handleTemplateSelect(template)}
                             >
-                                <Box sx={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'flex-start',
-                                    mb: 1
-                                }}>
-                                    <Typography
-                                        variant="h6"
-                                        sx={{
-                                            fontWeight: 600,
-                                            color: isSelected ? 'white' : 'text.primary',
-                                            fontSize: '1.1rem',
-                                            transition: 'color 0.3s ease-in-out'
-                                        }}
-                                    >
-                                        {job.title}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <Typography variant="subtitle1" fontWeight="bold">
+                                        {template.title}
                                     </Typography>
-                                    <Tooltip title="Delete">
+                                    <Tooltip title="Delete Template">
                                         <IconButton
                                             size="small"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleDeleteJob(job);
+                                                handleDeleteTemplate(template.id);
                                             }}
-                                            sx={{
-                                                color: isSelected ? 'white' : 'error.main',
-                                                '&:hover': {
-                                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.1)' : 'error.light',
-                                                },
-                                                transition: 'all 0.2s ease-in-out'
-                                            }}
+                                            sx={{ color: 'error.main' }}
                                         >
-                                            <DeleteIcon />
+                                            <DeleteIcon fontSize="small" />
                                         </IconButton>
                                     </Tooltip>
                                 </Box>
                                 <Typography
                                     variant="body2"
-                                    color={isSelected ? 'white' : 'text.secondary'}
+                                    color="text.secondary"
                                     sx={{
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 3,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        lineHeight: 1.5,
-                                        opacity: isSelected ? 1 : 0.9,
-                                        transition: 'all 0.3s ease-in-out'
+                                        mt: 1,
+                                        whiteSpace: 'pre-line',
+                                        maxHeight: '150px',
+                                        overflow: 'auto',
                                     }}
                                 >
-                                    {job.content}
+                                    {template.description}
                                 </Typography>
                             </Paper>
-                        );
-                    })}
-                </Box>
-            )}
+                        ))}
+                    </Stack>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Button
+                        onClick={() => setShowTemplates(false)}
+                        variant="contained"
+                        sx={{
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            px: 3,
+                        }}
+                    >
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* New Job Description Dialog */}
             <Dialog
@@ -276,7 +448,6 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
                 PaperProps={{
                     sx: {
                         borderRadius: 2,
-                        boxShadow: 24,
                     }
                 }}
             >
@@ -284,64 +455,46 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
                     borderBottom: '1px solid',
                     borderColor: 'divider',
                     pb: 2,
-                    bgcolor: 'primary.light',
-                    color: 'primary.main'
                 }}>
-                    Create New Job Description
+                    <Typography variant="h6">Create New Job Description</Typography>
                 </DialogTitle>
-                <DialogContent sx={{ pt: 3 }}>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        label="Job Title"
-                        fullWidth
-                        value={newJobTitle}
-                        onChange={(e) => setNewJobTitle(e.target.value)}
-                        sx={{
-                            mb: 2,
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: 1,
-                                '&:hover fieldset': {
-                                    borderColor: 'primary.main',
-                                }
-                            }
-                        }}
-                    />
-                    <TextField
-                        margin="dense"
-                        label="Job Description"
-                        fullWidth
-                        multiline
-                        rows={6}
-                        value={newJobDescription}
-                        onChange={(e) => setNewJobDescription(e.target.value)}
-                        sx={{
-                            '& .MuiOutlinedInput-root': {
-                                borderRadius: 1,
-                                '&:hover fieldset': {
-                                    borderColor: 'primary.main',
-                                }
-                            }
-                        }}
-                    />
+                <DialogContent sx={{ p: 3 }}>
+                    <Stack spacing={3}>
+                        <TextField
+                            autoFocus
+                            label="Job Title"
+                            fullWidth
+                            value={newJobTitle}
+                            onChange={(e) => setNewJobTitle(e.target.value)}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 2,
+                                },
+                            }}
+                        />
+                        <TextField
+                            label="Job Description"
+                            fullWidth
+                            multiline
+                            rows={6}
+                            value={newJobDescription}
+                            onChange={(e) => setNewJobDescription(e.target.value)}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 2,
+                                },
+                            }}
+                        />
+                    </Stack>
                 </DialogContent>
-                <DialogActions sx={{
-                    p: 2,
-                    borderTop: '1px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper'
-                }}>
+                <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                     <Button
                         onClick={() => setShowNewJobDialog(false)}
                         variant="outlined"
                         sx={{
-                            borderColor: 'primary.main',
-                            color: 'primary.main',
-                            borderRadius: 1,
-                            '&:hover': {
-                                borderColor: 'primary.dark',
-                                backgroundColor: 'primary.light',
-                            }
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            px: 3,
                         }}
                     >
                         Cancel
@@ -352,14 +505,9 @@ const JobDescriptionSelector = ({ onJobSelect }) => {
                         startIcon={<SaveIcon />}
                         disabled={!newJobTitle.trim() || !newJobDescription.trim()}
                         sx={{
-                            backgroundColor: 'primary.main',
-                            borderRadius: 1,
-                            '&:hover': {
-                                backgroundColor: 'primary.dark',
-                                transform: 'translateY(-1px)',
-                                boxShadow: 2
-                            },
-                            transition: 'all 0.2s ease-in-out'
+                            borderRadius: 2,
+                            textTransform: 'none',
+                            px: 3,
                         }}
                     >
                         Save

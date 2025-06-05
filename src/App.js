@@ -38,11 +38,11 @@ import SeekerApplicationsList from "./pages/job_applications/SeekerApplications"
 import JobApplicationsList from "./pages/job_applications/JobApplications";
 import ApplicationCreate from "./pages/job_applications/ApplicationCreate";
 // Applicant Ranking
-import ResumeRanking from "./pages/resume_ranking/ResumeRanking";
+import ResumeRanking from "./components/ResumeRanking/ResumeRanking";
 // Resume
 // import ResumeBuilder from "./pages/resume/ResumeBuilder";
 import Letter from "./pages/cover_letter/Letter";
-import ResumeScreeningDashboard from './components/ResumeScreening/ResumeScreeningDashboard';
+import ResumeScreening from "./components/ResumeScreening/ResumeScreeningDashboard";
 
 const theme = createTheme({
   palette: {
@@ -161,7 +161,7 @@ const App = () => (
           {/* Resume */}
           {/* <Route exact path="/resume" element={<ResumeBuilder />} /> */}
           <Route exact path="/cover-letter" element={<Letter />} />
-          <Route path="/resume-screening" element={<ResumeScreeningDashboard />} />
+          <Route path="/resume-screening" element={<ResumeScreening />} />
         </Routes>
       </AuthProvider>
     </ThemeProvider>

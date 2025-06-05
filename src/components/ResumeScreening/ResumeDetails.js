@@ -13,6 +13,7 @@ import {
     ListItemText,
     ListItemIcon,
     Paper,
+    Link,
 } from '@mui/material';
 import {
     Score as ScoreIcon,
@@ -24,7 +25,10 @@ import {
     Cancel as CancelIcon,
     Star as StarIcon,
     Add as AddIcon,
+    Link as LinkIcon,
+    Warning as WarningIcon,
 } from '@mui/icons-material';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
 const ResumeDetails = ({ resume }) => {
     const [expanded, setExpanded] = useState(false);
@@ -34,6 +38,17 @@ const ResumeDetails = ({ resume }) => {
     const handleChange = (panel) => (event, isExpanded) => {
         setExpanded(isExpanded ? panel : false);
     };
+
+    // AI Detection data for pie chart
+    const getAIDetectionData = () => {
+        const aiScore = resume.aiDetection?.score || 0;
+        return [
+            { name: 'AI Generated', value: aiScore },
+            { name: 'Human Written', value: 100 - aiScore }
+        ];
+    };
+
+    const COLORS = ['#ff4444', '#00C851'];
 
     return (
         <Box sx={{ mt: 2 }}>
@@ -59,6 +74,172 @@ const ResumeDetails = ({ resume }) => {
 
             <Divider sx={{ my: 3 }} />
 
+            {/* AI Detection */}
+            <Accordion expanded={expanded === 'aiDetection'} onChange={handleChange('aiDetection')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <WarningIcon sx={{ mr: 1 }} />
+                        <Typography variant="h6">AI Detection Analysis</Typography>
+                    </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 2 }}>
+                        <Box sx={{ width: '100%', height: 300 }}>
+                            <ResponsiveContainer>
+                                <PieChart>
+                                    <Pie
+                                        data={getAIDetectionData()}
+                                        cx="50%"
+                                        cy="50%"
+                                        labelLine={false}
+                                        outerRadius={100}
+                                        fill="#8884d8"
+                                        dataKey="value"
+                                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                        {getAIDetectionData().map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </Box>
+                        <Typography variant="subtitle1" gutterBottom>
+                            Verdict: {resume.aiDetection?.verdict || 'Not Analyzed'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" paragraph>
+                            {resume.aiDetection?.reasoning || 'No AI detection analysis available'}
+                        </Typography>
+                    </Box>
+                </AccordionDetails>
+            </Accordion>
+
+            <Divider sx={{ my: 3 }} />
+
+            {/* Online Presence */}
+            <Accordion expanded={expanded === 'onlinePresence'} onChange={handleChange('onlinePresence')}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <LinkIcon sx={{ mr: 1 }} />
+                        <Typography variant="h6">Online Presence</Typography>
+                    </Box>
+                </AccordionSummary>
+                <AccordionDetails>
+                    {/* LinkedIn */}
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                            LinkedIn Profile
+                        </Typography>
+                        <List>
+                            {(resume.onlinePresence?.linkedIn?.urls || []).map((url, index) => (
+                                <ListItem key={index}>
+                                    <ListItemIcon>
+                                        <LinkIcon color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={
+                                            <Link href={url} target="_blank" rel="noopener noreferrer">
+                                                {url}
+                                            </Link>
+                                        }
+                                        secondary={`Status: ${resume.onlinePresence?.linkedIn?.status || 'Not Found'}`}
+                                    />
+                                </ListItem>
+                            ))}
+                            {(!resume.onlinePresence?.linkedIn?.urls || resume.onlinePresence?.linkedIn?.urls.length === 0) && (
+                                <ListItem>
+                                    <ListItemText
+                                        primary="No LinkedIn profile found"
+                                        secondary={
+                                            resume.onlinePresence?.linkedIn?.search_url ? (
+                                                <Link href={resume.onlinePresence.linkedIn.search_url} target="_blank" rel="noopener noreferrer">
+                                                    Search for profile
+                                                </Link>
+                                            ) : (
+                                                "No search URL available"
+                                            )
+                                        }
+                                    />
+                                </ListItem>
+                            )}
+                        </List>
+                    </Box>
+
+                    {/* GitHub */}
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle1" gutterBottom>
+                            GitHub Profile
+                        </Typography>
+                        <List>
+                            {(resume.onlinePresence?.github?.urls || []).map((url, index) => (
+                                <ListItem key={index}>
+                                    <ListItemIcon>
+                                        <LinkIcon color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={
+                                            <Link href={url} target="_blank" rel="noopener noreferrer">
+                                                {url}
+                                            </Link>
+                                        }
+                                        secondary={`Status: ${resume.onlinePresence?.github?.status || 'Not Found'}`}
+                                    />
+                                </ListItem>
+                            ))}
+                            {(!resume.onlinePresence?.github?.urls || resume.onlinePresence?.github?.urls.length === 0) && (
+                                <ListItem>
+                                    <ListItemText
+                                        primary="No GitHub profile found"
+                                        secondary={
+                                            resume.onlinePresence?.github?.search_url ? (
+                                                <Link href={resume.onlinePresence.github.search_url} target="_blank" rel="noopener noreferrer">
+                                                    Search for profile
+                                                </Link>
+                                            ) : (
+                                                "No search URL available"
+                                            )
+                                        }
+                                    />
+                                </ListItem>
+                            )}
+                        </List>
+                    </Box>
+
+                    {/* Personal Websites */}
+                    <Box>
+                        <Typography variant="subtitle1" gutterBottom>
+                            Personal Websites
+                        </Typography>
+                        <List>
+                            {(resume.onlinePresence?.personalWebsites?.urls || []).map((url, index) => (
+                                <ListItem key={index}>
+                                    <ListItemIcon>
+                                        <LinkIcon color="primary" />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={
+                                            <Link href={url} target="_blank" rel="noopener noreferrer">
+                                                {url}
+                                            </Link>
+                                        }
+                                        secondary={`Status: ${resume.onlinePresence?.personalWebsites?.status || 'Not Found'}`}
+                                    />
+                                </ListItem>
+                            ))}
+                            {(!resume.onlinePresence?.personalWebsites?.urls || resume.onlinePresence?.personalWebsites?.urls.length === 0) && (
+                                <ListItem>
+                                    <ListItemText primary="No personal websites found" />
+                                </ListItem>
+                            )}
+                        </List>
+                    </Box>
+                </AccordionDetails>
+            </Accordion>
+
+            <Divider sx={{ my: 3 }} />
+
             {/* Skills */}
             <Accordion expanded={expanded === 'skills'} onChange={handleChange('skills')}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -70,65 +251,42 @@ const ResumeDetails = ({ resume }) => {
                 <AccordionDetails>
                     <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                            Matching Skills
+                            Match Score: {resume.skills?.match_score || 0}%
                         </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                            {resume.skills.matching_skills.map((skill, index) => (
-                                <Chip
-                                    key={index}
-                                    label={`${skill.name} (${skill.level})`}
-                                    color="primary"
-                                    variant="outlined"
-                                />
-                            ))}
-                        </Box>
+                        <Typography variant="body2" color="text.secondary" paragraph>
+                            {resume.skills?.skill_summary || 'No skill summary available'}
+                        </Typography>
                     </Box>
 
-                    {resume.skills.additional_skills.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom color="primary">
-                                Additional Valuable Skills
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {resume.skills.additional_skills.map((skill, index) => (
-                                    <Chip
-                                        key={index}
-                                        label={`${skill.name} (${skill.level})`}
-                                        color="primary"
-                                        variant="outlined"
-                                        icon={<AddIcon />}
-                                    />
-                                ))}
-                            </Box>
-                        </Box>
-                    )}
+                    <Typography variant="subtitle1" gutterBottom>
+                        Matched Skills
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                        {(resume.skills?.matched_skills || []).map((skill, index) => (
+                            <Chip
+                                key={index}
+                                icon={<CheckCircleIcon />}
+                                label={skill}
+                                color="success"
+                                variant="outlined"
+                            />
+                        ))}
+                    </Box>
 
-                    {resume.skills.missing_skills.length > 0 && (
-                        <Box sx={{ mb: 2 }}>
-                            <Typography variant="subtitle1" gutterBottom color="error">
-                                Missing Skills
-                            </Typography>
-                            <List dense>
-                                {resume.skills.missing_skills.map((skill, index) => (
-                                    <ListItem key={index}>
-                                        <ListItemIcon>
-                                            <CancelIcon color="error" />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={skill.name}
-                                            secondary={`${skill.importance} priority: ${skill.reason}`}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Box>
-                    )}
-
-                    <Paper sx={{ p: 2, mt: 2, bgcolor: 'background.default' }}>
-                        <Typography variant="body2" color="text.secondary">
-                            {resume.skills.skills_summary}
-                        </Typography>
-                    </Paper>
+                    <Typography variant="subtitle1" gutterBottom>
+                        Missing Skills
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {(resume.skills?.missing_skills || []).map((skill, index) => (
+                            <Chip
+                                key={index}
+                                icon={<CancelIcon />}
+                                label={skill}
+                                color="error"
+                                variant="outlined"
+                            />
+                        ))}
+                    </Box>
                 </AccordionDetails>
             </Accordion>
 
@@ -145,10 +303,10 @@ const ResumeDetails = ({ resume }) => {
                 <AccordionDetails>
                     <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                            Match Score: {resume.experience.match_score}%
+                            Match Score: {resume.experience?.match_score || 0}%
                         </Typography>
                         <Typography variant="body2" color="text.secondary" paragraph>
-                            {resume.experience.experience_summary}
+                            {resume.experience?.experience_summary || 'No experience summary available'}
                         </Typography>
                     </Box>
 
@@ -156,104 +314,26 @@ const ResumeDetails = ({ resume }) => {
                         Relevant Experience
                     </Typography>
                     <List>
-                        {resume.experience.relevant_experience.map((exp, index) => (
+                        {(resume.experience?.experience_details || []).map((exp, index) => (
                             <ListItem key={index} alignItems="flex-start">
                                 <ListItemIcon>
                                     <CheckCircleIcon color="primary" />
                                 </ListItemIcon>
                                 <ListItemText
-                                    primary={`${exp.role} at ${exp.company}`}
+                                    primary={`${exp.title} at ${exp.company}`}
                                     secondary={
                                         <>
                                             <Typography component="span" variant="body2" color="text.primary">
                                                 {exp.duration}
                                             </Typography>
                                             <br />
-                                            {exp.relevance}
-                                            <br />
-                                            <Typography variant="body2" color="text.secondary">
-                                                Key Achievements:
-                                            </Typography>
-                                            <List dense>
-                                                {exp.key_achievements.map((achievement, i) => (
-                                                    <ListItem key={i}>
-                                                        <ListItemIcon>
-                                                            <StarIcon fontSize="small" color="primary" />
-                                                        </ListItemIcon>
-                                                        <ListItemText primary={achievement} />
-                                                    </ListItem>
-                                                ))}
-                                            </List>
+                                            {exp.description}
                                         </>
                                     }
                                 />
                             </ListItem>
                         ))}
                     </List>
-
-                    {resume.experience.additional_experience.length > 0 && (
-                        <Box sx={{ mt: 3 }}>
-                            <Typography variant="subtitle1" gutterBottom color="primary">
-                                Additional Valuable Experience
-                            </Typography>
-                            <List>
-                                {resume.experience.additional_experience.map((exp, index) => (
-                                    <ListItem key={index} alignItems="flex-start">
-                                        <ListItemIcon>
-                                            <AddIcon color="primary" />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={`${exp.role} at ${exp.company}`}
-                                            secondary={
-                                                <>
-                                                    <Typography component="span" variant="body2" color="text.primary">
-                                                        {exp.duration}
-                                                    </Typography>
-                                                    <br />
-                                                    {exp.value}
-                                                    <br />
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        Key Achievements:
-                                                    </Typography>
-                                                    <List dense>
-                                                        {exp.key_achievements.map((achievement, i) => (
-                                                            <ListItem key={i}>
-                                                                <ListItemIcon>
-                                                                    <StarIcon fontSize="small" color="primary" />
-                                                                </ListItemIcon>
-                                                                <ListItemText primary={achievement} />
-                                                            </ListItem>
-                                                        ))}
-                                                    </List>
-                                                </>
-                                            }
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Box>
-                    )}
-
-                    {resume.experience.missing_experience.length > 0 && (
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle1" color="error" gutterBottom>
-                                Missing Experience
-                            </Typography>
-                            <List dense>
-                                {resume.experience.missing_experience.map((exp, index) => (
-                                    <ListItem key={index}>
-                                        <ListItemIcon>
-                                            <CancelIcon color="error" />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={exp.requirement}
-                                            secondary={`${exp.importance} priority: ${exp.reason}`}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Box>
-                    )}
                 </AccordionDetails>
             </Accordion>
 
@@ -270,14 +350,14 @@ const ResumeDetails = ({ resume }) => {
                 <AccordionDetails>
                     <Box sx={{ mb: 2 }}>
                         <Typography variant="subtitle1" gutterBottom>
-                            Match Score: {resume.education.match_score}%
+                            Match Score: {resume.education?.match_score || 0}%
                         </Typography>
                         <Typography variant="body2" color="text.secondary" paragraph>
-                            {resume.education.education_summary}
+                            {resume.education?.education_summary || 'No education summary available'}
                         </Typography>
                     </Box>
                     <List>
-                        {resume.education.education_details.map((edu, index) => (
+                        {(resume.education?.education_details || []).map((edu, index) => (
                             <ListItem key={index} alignItems="flex-start">
                                 <ListItemIcon>
                                     <CheckCircleIcon color="primary" />
@@ -299,26 +379,6 @@ const ResumeDetails = ({ resume }) => {
                             </ListItem>
                         ))}
                     </List>
-                    {resume.education.missing_education.length > 0 && (
-                        <Box sx={{ mt: 2 }}>
-                            <Typography variant="subtitle1" color="error" gutterBottom>
-                                Missing Education
-                            </Typography>
-                            <List dense>
-                                {resume.education.missing_education.map((edu, index) => (
-                                    <ListItem key={index}>
-                                        <ListItemIcon>
-                                            <CancelIcon color="error" />
-                                        </ListItemIcon>
-                                        <ListItemText
-                                            primary={edu.requirement}
-                                            secondary={`${edu.importance} priority: ${edu.reason}`}
-                                        />
-                                    </ListItem>
-                                ))}
-                            </List>
-                        </Box>
-                    )}
                 </AccordionDetails>
             </Accordion>
         </Box>
