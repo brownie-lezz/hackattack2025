@@ -92,20 +92,30 @@ const JobCreationPage = () => {
     };
     
     setIsSubmitting(true);
+    console.log('Attempting to save job with status:', status, jobData);
     
     try {
       const result = await createJob(jobData);
-      console.log("Job saved:", result);
+      console.log("Job save attempt result:", result);
       
-      setSubmissionResult(result);
-      if (result.success) {
-        // Move to success step
+      if (result && result.success) {
+        setSubmissionResult(result);
         setActiveStep(4); // Index of the success step
+      } else {
+        // Handle cases where createJob resolves but indicates failure (e.g., { success: false, error: ... })
+        const errorMessage = result?.error?.message || "Failed to save job. An unknown error occurred.";
+        console.error("Job save failed (result.success was false):", errorMessage, result?.error);
+        alert(`Error: ${errorMessage}`);
+        // Ensure isSubmitting is reset even if not moving to success step
+        // The finally block will also handle this, but being explicit here is fine for clarity.
       }
     } catch (error) {
-      console.error("Error saving job:", error);
-      alert("There was an error saving the job. Please try again.");
+      // Handle cases where createJob throws an error
+      const errorMessage = error.message || "An unexpected error occurred while saving the job.";
+      console.error("Error caught during handleSaveJob:", error);
+      alert(`Error: ${errorMessage}`);
     } finally {
+      console.log("Resetting isSubmitting in finally block.");
       setIsSubmitting(false);
     }
   };
