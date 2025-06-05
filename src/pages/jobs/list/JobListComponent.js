@@ -5,6 +5,7 @@ import Spinner from "../../../components/Spinner";
 import Pagination from "./Pagination";
 import JobItem from "./JobItem";
 import "../jobs.css";
+import { getJobs } from "../../../utils/jobService";
 
 const JobListComponent = ({ jobType }) => {
   let jobListUrl, pageTitle;
@@ -21,6 +22,7 @@ const JobListComponent = ({ jobType }) => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [error, setError] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [jobsPerPage] = useState(10);
   const [filteredJobs, setFilteredJobs] = useState([]);
@@ -28,41 +30,70 @@ const JobListComponent = ({ jobType }) => {
 
   useEffect(() => {
     setIsLoading(true);
-    axiosInstance
-      .get(jobListUrl)
-      .then((res) => {
-        // console.table("Jobs:", res.data);
-        console.log(`Fetched ${res.data.length} jobs`);
-        setJobs(res.data);
-        setFilteredJobs(res.data);
-      })
-      .catch((err) => console.log(err))
-      .finally(() => setIsLoading(false));
-  }, [jobListUrl]);
+    setError(null);
 
-  // Get current posts
+    if (jobType === "ALL") {
+      getJobs()
+        .then((response) => {
+          if (response.success) {
+            console.log(`Fetched ${response.data.length} jobs from Supabase`);
+            setJobs(response.data);
+            setFilteredJobs(response.data);
+          } else {
+            console.error("Failed to fetch jobs from Supabase:", response.error);
+            setError(response.error?.message || "Failed to fetch jobs. Please try again later.");
+            setJobs([]);
+            setFilteredJobs([]);
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching jobs from Supabase:", err);
+          setError(err.message || "An unexpected error occurred while fetching jobs.");
+          setJobs([]);
+          setFilteredJobs([]);
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      axiosInstance
+        .get(jobListUrl)
+        .then((res) => {
+          console.log(`Fetched ${res.data.length} jobs via axios for ${jobType}`);
+          setJobs(res.data);
+          setFilteredJobs(res.data);
+        })
+        .catch((err) => {
+          console.log(err);
+          setError(err.message || `Failed to fetch ${jobType} jobs.`);
+          setJobs([]);
+          setFilteredJobs([]);
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [jobType, jobListUrl]);
+
   const indexofLastJob = currentPage * jobsPerPage;
   const indexofFirstJob = indexofLastJob - jobsPerPage;
   const currentJobs = filteredJobs
     ? filteredJobs.slice(indexofFirstJob, indexofLastJob)
     : [];
 
-  // Change page
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
-  // Handle search input change
   const handleSearchChange = (event) => {
-    const searchTerm = event.target.value.toLowerCase();
-    setSearchTerm(searchTerm);
+    const searchTermValue = event.target.value.toLowerCase();
+    setSearchTerm(searchTermValue);
+    setCurrentPage(1);
 
-    if (searchTerm === "") {
+    if (searchTermValue === "") {
       setFilteredJobs(jobs);
     } else {
       setFilteredJobs(
         jobs.filter(
           (job) =>
-            job.title.toLowerCase().includes(searchTerm) ||
-            job.company.toLowerCase().includes(searchTerm)
+            (job.title && job.title.toLowerCase().includes(searchTermValue)) ||
+            (job.company_name && job.company_name.toLowerCase().includes(searchTermValue)) ||
+            (job.location && job.location.toLowerCase().includes(searchTermValue)) ||
+            (job.skills && Array.isArray(job.skills) && job.skills.some(skill => skill.toLowerCase().includes(searchTermValue)))
         )
       );
     }
@@ -70,7 +101,19 @@ const JobListComponent = ({ jobType }) => {
 
   if (isLoading) return <Spinner />;
 
-  if (jobs.length === 0) {
+  if (error) {
+    return (
+      <div className="container-fluid py-5 px-5">
+        <h2 className="text-center mb-5 page-title fs-1">{pageTitle}</h2>
+        <div className="alert alert-danger text-center" role="alert">
+          <h4>Error Fetching Jobs</h4>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (jobs.length === 0 && !isLoading) {
     return (
       <div className="container-fluid py-5 px-5">
         <h2 className="text-center mb-5 page-title fs-1">{pageTitle}</h2>
@@ -82,25 +125,32 @@ const JobListComponent = ({ jobType }) => {
   return (
     <div className="container-fluid py-5 px-5">
       <h2 className="text-center mb-5 page-title fs-1">{pageTitle}</h2>
-      <div className="search-box">
+      <div className="search-box mb-4">
         <input
           type="text"
-          placeholder="Enter Job Title or Company Name"
+          className="form-control form-control-lg"
+          placeholder="Search by Job Title, Company, Location, or Skill..."
           value={searchTerm}
           onChange={handleSearchChange}
         />
-        <div className="icon-search">
-          <i className="bi bi-search"></i>
-        </div>
       </div>
-      {currentJobs.map((job, index) => (
-        <JobItem key={index} job={job} jobType={jobType} />
-      ))}
-      <Pagination
-        jobsPerPage={jobsPerPage}
-        totalJobs={filteredJobs.length}
-        paginate={paginate}
-      />
+      {currentJobs.length > 0 ? (
+        currentJobs.map((job) => (
+          <JobItem key={job.id || job._id || Math.random()} job={job} jobType={jobType} />
+        ))
+      ) : (
+        <div className="text-center mt-4">
+          <p className="fs-5 text-muted">No jobs match your current search criteria.</p>
+        </div>
+      )}
+      {filteredJobs.length > jobsPerPage && (
+        <Pagination
+          jobsPerPage={jobsPerPage}
+          totalJobs={filteredJobs.length}
+          paginate={paginate}
+          currentPage={currentPage}
+        />
+      )}
     </div>
   );
 };

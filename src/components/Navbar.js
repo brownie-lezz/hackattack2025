@@ -60,12 +60,54 @@ function Navbar() {
   );
 
   const employerLinks = () => (
-    <Box sx={{ display: 'flex', gap: 2 }}>
-      <Button component={Link} to="/jobs/create" color="inherit">Create Job</Button>
-      <Button component={Link} to="/jobs/employer" color="inherit">Your Jobs</Button>
-      <Button component={Link} to="/profile/employer" color="inherit">Profile</Button>
-      <Button component={Link} to="/logout" color="inherit">Logout</Button>
-    </Box>
+    <ul className="navbar-nav">
+      <li className="nav-item dropdown">
+        <span
+          className="nav-link dropdown-toggle"
+          role="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          <span>Hire</span>
+        </span>
+        <ul className="dropdown-menu">
+          <li>
+            <Link className="dropdown-item" to="/jobs/create">
+              <span>Create Job</span>
+            </Link>
+          </li>
+          <li>
+            <Link className="dropdown-item" to="/jobs/employer">
+              <span>Your Jobs</span>
+            </Link>
+          </li>
+        </ul>
+      </li>
+      <li className="nav-item">
+        <Link className="nav-link" to="/profile/employer">
+          <span>Profile</span>
+        </Link>
+      </li>
+      <li className="nav-item">
+        <Link className="nav-link" to="/logout">
+          <span>Logout</span>
+        </Link>
+      </li>
+    </ul>
+  );
+
+  const authLinks = () => (
+    <>{user.role === 'employer' ? employerLinks() : seekerLinks()}</>
+  );
+
+  const publicLinks = () => (
+    <ul className="navbar-nav mx-auto">
+      <li className="nav-item">
+        <Link className="nav-link" to="/jobs">
+          <span>Jobs</span>
+        </Link>
+      </li>
+    </ul>
   );
 
   const guestLinks = () => (

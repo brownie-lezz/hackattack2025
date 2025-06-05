@@ -1,202 +1,185 @@
 import { useEffect, useState, useContext } from "react";
-import { Link, useParams } from "react-router-dom";
-
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { Container, Typography, Box, Paper, Chip, Button, CircularProgress, Alert, Grid, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import { BusinessCenter, LocationOn, MonetizationOn, Schedule, Description, Checklist, School, Category, WorkHistory, Person } from '@mui/icons-material';
 import AuthContext from "../../../context/AuthContext";
-
-import axiosInstance from "../../../utils/axios_instance";
-import { urls } from "../../../utils/config";
+import { getJob } from "../../../utils/jobService";
 
 const JobDetail = () => {
   const { user } = useContext(AuthContext);
   const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { id } = useParams();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    axiosInstance
-      .get(urls.JOB_DETAIL.replace(":id", id))
-      .then((res) => {
-        console.table("Res:", res.data);
-        setJob(res.data);
-      })
-      .catch((err) => console.log(err));
+    if (!id) {
+      setError("Job ID is missing.");
+      setLoading(false);
+      return;
+    }
+
+    const fetchJob = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await getJob(id);
+        if (response.success && response.job) {
+          console.log("Fetched job:", response.job);
+          setJob(response.job);
+        } else {
+          console.error("Job not found or error fetching job:", response.error);
+          setError(response.error?.message || "Job not found or could not be loaded.");
+          setJob(null);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching job:", err);
+        setError(err.message || "An unexpected error occurred.");
+        setJob(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchJob();
   }, [id]);
 
-  if (!job) return <></>;
+  if (loading) {
+    return (
+      <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
+        <CircularProgress />
+        <Typography sx={{ ml: 2 }}>Loading job details...</Typography>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container sx={{ textAlign: 'center', mt: 5 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>
+        <Button variant="outlined" onClick={() => navigate('/jobs')}>Back to Jobs</Button>
+      </Container>
+    );
+  }
+
+  if (!job) {
+    return (
+      <Container sx={{ textAlign: 'center', mt: 5 }}>
+        <Typography variant="h5">Job not found.</Typography>
+        <Button variant="outlined" onClick={() => navigate('/jobs')} sx={{ mt: 2 }}>Back to Jobs</Button>
+      </Container>
+    );
+  }
+
+  const renderListItems = (items, icon) => {
+    if (!items || items.length === 0) return <Typography variant="body2" color="text.secondary">Not specified</Typography>;
+    return (
+      <List dense disablePadding>
+        {items.map((item, index) => (
+          <ListItem key={index} disableGutters sx={{ pl: 0 }}>
+            {icon && <ListItemIcon sx={{ minWidth: '30px' }}>{icon}</ListItemIcon>}
+            <ListItemText primaryTypographyProps={{ variant: 'body2' }} primary={item} />
+          </ListItem>
+        ))}
+      </List>
+    );
+  };
 
   return (
-    <div className="container-fluid py-5 px-5">
-      <div className="row">
-        <div className="container-xxl py-5 wow fadeInUp" data-wow-delay="0.1s">
-          <div className="container">
-            <div className="row gy-5 gx-4">
-              <h2 className="page-title">{job.company.company_name}</h2>
-              <div className="col-lg-8">
-                <div className="d-flex align-items-center mb-5">
-                  <div className="text-start ps-4">
-                    <h3 className="mb-3">{job.title}</h3>
-                    <span className="text-truncate me-3">
-                      <i className="fa fa-map-marker-alt text-primary me-2"></i>
-                      {job.location}
-                    </span>
-                    <span className="text-truncate me-3">
-                      <i className="far fa-clock text-primary me-2"></i>
-                      {job.employment_type}
-                    </span>
-                    <span className="text-truncate me-0">
-                      <i className="far fa-money-bill-alt text-primary me-2"></i>
-                      {job.salary_range}
-                    </span>
-                  </div>
-                </div>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Paper elevation={3} sx={{ p: { xs: 2, md: 4 }, borderRadius: 2 }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+          {job.title || "Job Title Not Available"}
+        </Typography>
 
-                <div className="mb-5">
-                  <h4 className="mb-3 p-3 jd-title">Job description</h4>
-                  <p>{job.description}</p>
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          {job.location && (
+            <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
+              <LocationOn color="action" sx={{ mr: 1 }} />
+              <Typography variant="body1">{job.location}</Typography>
+            </Grid>
+          )}
+          {job.job_type && (
+            <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
+              <BusinessCenter color="action" sx={{ mr: 1 }} />
+              <Typography variant="body1">{job.job_type}</Typography>
+            </Grid>
+          )}
+          {job.salary_range && (
+            <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
+              <MonetizationOn color="action" sx={{ mr: 1 }} />
+              <Typography variant="body1">{job.salary_range}</Typography>
+            </Grid>
+          )}
+          {job.experience_level && (
+            <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
+              <WorkHistory color="action" sx={{ mr: 1 }} />
+              <Typography variant="body1">Experience: {job.experience_level}</Typography>
+            </Grid>
+          )}
+          {job.department && (
+            <Grid item xs={12} sm={6} md={4} sx={{ display: 'flex', alignItems: 'center' }}>
+              <Category color="action" sx={{ mr: 1 }} />
+              <Typography variant="body1">Department: {job.department}</Typography>
+            </Grid>
+          )}
+        </Grid>
 
-                  <h4 className="mb-3 p-3 jd-title">Job specification</h4>
-                  <table>
-                    <tbody>
-                      <tr>
-                        <td className="w-33 p-2">Education level</td>
-                        <td className="w-3 p-2">:</td>
-                        <td className="w-64 p-2">{job.education_level}</td>
-                      </tr>
-                      <tr>
-                        <td className="w-33 p-2">Experience Required</td>
-                        <td className="w-3 p-2">:</td>
-                        <td className="w-64 p-2">
-                          {job.experience_required} years
-                        </td>
-                      </tr>
-                      <tr>
-                        <td className="w-33 p-2">
-                          Professional Skill Required
-                        </td>
-                        <td className="w-3 p-2">:</td>
-                        <td className="w-64 p-2">{job.skill_required}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Job Description</Typography>
+          <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap' }}>
+            {job.description || "No description provided."}
+          </Typography>
+        </Box>
 
-                  <h4 className="mb-3 p-3 jd-title">Qualifications</h4>
-                  <p>
-                    The following Qualifications are expected when you apply for
-                    the job.
-                  </p>
-                  <ul className="list-unstyled">
-                    <li>
-                      <i className="fa fa-angle-right text-primary me-2"></i>At
-                      least a {job.education_level} degree holder{" "}
-                      {job.education_field_of_study &&
-                        `in ${job.education_field_of_study}, or related field`}
-                      .
-                    </li>
-                    <li>
-                      <i className="fa fa-angle-right text-primary me-2"></i>A
-                      minimum of {job.experience_required} years of experience.
-                    </li>
-                    <li>
-                      <i className="fa fa-angle-right text-primary me-2"></i>
-                      Familiarization with {job.skill_required}.
-                    </li>
-                  </ul>
-                </div>
-                {user && user.is_employer ? null : (
-                  <>
-                    <Link
-                      to={`/jobs/${id}/apply`}
-                      className="btn btn-outline-primary btn-lg me-2"
-                    >
-                      Apply
-                    </Link>
-                    <Link
-                      to={`/jobs/${id}/ai-examination`}
-                      className="btn btn-outline-success btn-lg"
-                    >
-                      Take AI Examination
-                    </Link>
-                  </>
-                )}
-              </div>
+        {job.skills && job.skills.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Skills</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {job.skills.map((skill, index) => (
+                <Chip key={index} label={skill} color="primary" variant="outlined" />
+              ))}
+            </Box>
+          </Box>
+        )}
 
-              <div className="col-lg-4">
-                <div
-                  className="bg-light rounded p-5 mb-4 wow slideInUp shadow job-summary"
-                  data-wow-delay="0.1s"
-                >
-                  <h4 className="mb-4">Job Summary</h4>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Vacancy: {job.no_of_vacancy} Position
-                  </p>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>Job
-                    Nature: {job.employment_type}
-                  </p>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Salary: {job.salary_range}
-                  </p>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Location: {job.location}
-                  </p>
-                  <p className="m-0">
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Deadline: {job.deadline}
-                  </p>
-                </div>
-                <div
-                  className="bg-light rounded p-5 mb-4 shadow job-summary"
-                  data-wow-delay="0.1s"
-                >
-                  <h4 className="mb-4">Company Detail</h4>
-                  <h5 className="display-6">
-                    {" "}
-                    <Link
-                      to={`/profile/employer/${job.posted_by}`}
-                      style={{ textDecoration: "none" }}
-                    >
-                      {job.company.company_name}{" "}
-                    </Link>
-                  </h5>
-                  <p className="text-muted">{job.company.contact_email}</p>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Location: {job.company.company_location}
-                  </p>
-                  <p>
-                    <i className="fa fa-angle-right text-primary me-2"></i>
-                    Country: {job.company.country}
-                  </p>
-                  {job.company.company_description && (
-                    <p>
-                      {job.company.company_description.substring(0, 200)}...
-                    </p>
-                  )}
-                  <p className="text-center text-primary m-0">
-                    <a
-                      href={job.company.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <i className="fa fa-linkedin mx-2"></i>
-                    </a>
-                    <a
-                      href={job.company.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <i className="fa fa-globe mx-2"></i>
-                    </a>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        {job.responsibilities && job.responsibilities.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Responsibilities</Typography>
+            {renderListItems(job.responsibilities, <Checklist fontSize="small" color="primary" />)}
+          </Box>
+        )}
+
+        {job.qualifications && job.qualifications.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Qualifications</Typography>
+            {renderListItems(job.qualifications, <School fontSize="small" color="primary" />)}
+          </Box>
+        )}
+
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          {user && user.is_seeker && (
+            <Button
+              variant="contained"
+              color="primary"
+              component={Link}
+              to={`/jobs/${id}/apply`}
+              size="large"
+            >
+              Apply Now
+            </Button>
+          )}
+          <Button
+            variant="outlined"
+            onClick={() => navigate(-1)}
+            sx={{ ml: user && user.is_seeker ? 2 : 0 }}
+          >
+            Back
+          </Button>
+        </Box>
+      </Paper>
+    </Container>
   );
 };
 

@@ -25,6 +25,7 @@ import UpdateProfile from "./pages/user/UpdateProfile";
 // Jobs
 import JobList from "./pages/jobs/list/JobList";
 import JobCreate from "./pages/jobs/crud/JobCreate";
+import JobCreationPage from "./pages/jobs/JobCreationPage";
 import JobDetail from "./pages/jobs/crud/JobDetail";
 import JobUpdate from "./pages/jobs/crud/JobUpdate";
 import JobDelete from "./pages/jobs/crud/JobDelete";
@@ -117,6 +118,7 @@ const App = () => (
           <Route exact path="/jobs/:id/update" element={<JobUpdate />} />
           <Route exact path="/jobs/:id/delete" element={<JobDelete />} />
           <Route exact path="/jobs/create" element={<JobCreate />} />
+          <Route exact path="/jobs/create-ai" element={<JobCreationPage />} />
           <Route exact path="/jobs/employer" element={<EmployerJobList />} />
           <Route exact path="/jobs/explore" element={<ScrapedJobList />} />
           <Route exact path="/jobs/bookmarks" element={<BookmarkJobList />} />
