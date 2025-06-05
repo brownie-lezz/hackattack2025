@@ -19,3 +19,4 @@ scikit-learn>=1.0.0
 cloudpickle>=2.0.0
 python-dateutil>=2.8.2
 careerjet-api-client>=1.0.0 
+sentence-transformers

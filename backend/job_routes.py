@@ -1,8 +1,4 @@
 from flask import Blueprint, request, jsonify
-import logging
-import traceback
-
-logger = logging.getLogger(__name__)
 
 # Create Blueprint for job routes
 job_routes = Blueprint('job_routes', __name__)
@@ -10,32 +6,19 @@ job_routes = Blueprint('job_routes', __name__)
 # Try to import ML service
 try:
     from ml_model.salary_service import prediction_service
-    ml_available = True
-    logger.info("ML service imported successfully")
 except ImportError as e:
-    # Fallback to the basic prediction service
-    try:
-        from ml_model.fallback_service import fallback_service as prediction_service
-        ml_available = True
-        logger.warning("Using fallback prediction service due to ML import error")
-    except ImportError:
-        prediction_service = None
-        ml_available = False
-        logger.error("Failed to import both ML service and fallback service")
-    logger.error(f"Failed to import ML service: {e}")
+    # If prediction_service is critical and fails to import, 
+    # the app might not work correctly or main.py's error handling for blueprint registration will catch it.
+    # For now, allow it to proceed; calls to a potentially None prediction_service will error at runtime.
+    prediction_service = None # Explicitly set to None if import fails, to be checked before use if necessary
 
 @job_routes.route('/api/jobs/salary-prediction', methods=['POST'])
 def predict_salary():
     """
     API endpoint for salary prediction
     """
-    # Check if ML is available
-    if not ml_available:
-        return jsonify({
-            "success": False,
-            "error": "ML functionality not available",
-            "fallback": True
-        }), 503  # Service Unavailable
+    if not prediction_service:
+        return jsonify({"success": False, "error": "Prediction service is not available"}), 503
         
     try:
         # Get data from the request
@@ -59,15 +42,16 @@ def predict_salary():
         
         # Get prediction from the service
         result = prediction_service.predict(ml_request_data)
+        
+        if not result.get("success", False):
+            return jsonify(result), 500 # Service reported an error
+            
         return jsonify(result)
             
     except Exception as e:
-        logger.error(f"Error predicting salary: {e}")
-        traceback.print_exc()
         return jsonify({
             "success": False,
-            "error": str(e),
-            "fallback": True
+            "error": str(e)
         }), 500
 
 
@@ -76,13 +60,8 @@ def get_similar_jobs():
     """
     API endpoint for similar jobs
     """
-    # Check if ML is available
-    if not ml_available:
-        return jsonify({
-            "success": False,
-            "error": "ML functionality not available",
-            "fallback": True
-        }), 503  # Service Unavailable
+    if not prediction_service:
+        return jsonify({"success": False, "error": "Prediction service is not available"}), 503
         
     try:
         # Get data from the request
@@ -100,13 +79,16 @@ def get_similar_jobs():
         similar_jobs = prediction_service.get_similar_jobs(request_data)
         return jsonify(similar_jobs)
             
-    except Exception as e:
-        logger.error(f"Error getting similar jobs: {e}")
-        traceback.print_exc()
+    except RuntimeError as e:
+        # Handle errors specifically from the get_similar_jobs service call
         return jsonify({
             "success": False,
-            "error": str(e),
-            "fallback": True
+            "error": str(e) 
+        }), 503
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
         }), 500
 
 
@@ -130,8 +112,6 @@ def create_job():
         })
             
     except Exception as e:
-        logger.error(f"Error creating job: {e}")
-        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)

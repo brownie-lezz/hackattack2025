@@ -18,12 +18,15 @@ import JobDetailsForm from '../../components/JobCreationWizard/JobDetailsForm';
 import JobRequirementsForm from '../../components/JobCreationWizard/JobRequirementsForm';
 import SalaryInsightsForm from '../../components/JobCreationWizard/SalaryInsightsForm';
 import JobPreview from '../../components/JobCreationWizard/JobPreview';
+import JobSuccessPage from '../../components/JobCreationWizard/JobSuccessPage';
+import { createJob } from '../../utils/jobService';
 
 const steps = [
   { id: 'job-details', label: 'Job Details' },
   { id: 'requirements', label: 'Requirements' },
   { id: 'ai-insights', label: 'Salary Insights' },
   { id: 'preview', label: 'Preview' },
+  { id: 'success', label: 'Success' }
 ];
 
 const JobCreationPage = () => {
@@ -41,6 +44,8 @@ const JobCreationPage = () => {
     salary: { min: 0, max: 0, suggested: { min: 0, max: 0 }, isMonthly: true },
     similarJobs: []
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
   
   const navigate = useNavigate();
 
@@ -62,18 +67,46 @@ const JobCreationPage = () => {
     }
   };
 
+  const handleCreateAnother = () => {
+    setFormData({
+      title: '',
+      description: '',
+      department: '',
+      location: '',
+      type: 'Full-time',
+      experience: 'Mid-Level',
+      skills: [],
+      responsibilities: [],
+      qualifications: [],
+      salary: { min: 0, max: 0, suggested: { min: 0, max: 0 }, isMonthly: true },
+      similarJobs: []
+    });
+    setSubmissionResult(null);
+    setActiveStep(0);
+  };
+
   const handleSaveJob = async (status = 'Draft') => {
+    const jobData = {
+      ...formData,
+      status
+    };
+    
+    setIsSubmitting(true);
+    
     try {
-      // Here you would typically send the data to your backend
-      // For now we'll just console log and navigate back
-      console.log('Saving job with status:', status);
-      console.log('Job data:', { ...formData, status });
+      const result = await createJob(jobData);
+      console.log("Job saved:", result);
       
-      // Navigate back to jobs list
-      navigate('/jobs');
+      setSubmissionResult(result);
+      if (result.success) {
+        // Move to success step
+        setActiveStep(4); // Index of the success step
+      }
     } catch (error) {
-      console.error('Error saving job:', error);
-      alert('Failed to save job. Please try again.');
+      console.error("Error saving job:", error);
+      alert("There was an error saving the job. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -102,6 +135,12 @@ const JobCreationPage = () => {
         );
       case 3:
         return <JobPreview job={formData} />;
+      case 4:
+        return <JobSuccessPage 
+                 jobId={submissionResult?.jobId}
+                 onViewJob={() => navigate(`/jobs/${submissionResult?.jobId}`)}
+                 onCreateAnother={handleCreateAnother}
+               />;
       default:
         return null;
     }
@@ -109,80 +148,90 @@ const JobCreationPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Create New Job Position
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Fill in the details to create a complete job posting with AI-powered salary insights
-      </Typography>
-      
-      <Box sx={{ my: 4 }}>
-        <Stepper activeStep={activeStep} alternativeLabel>
-          {steps.map((step, index) => (
-            <Step key={step.id} completed={activeStep > index}>
-              <StepLabel>{step.label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Box>
+      {activeStep < 4 && (
+        <>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Create New Job Position
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+            Fill in the details to create a complete job posting with AI-powered salary insights
+          </Typography>
+          
+          <Box sx={{ my: 4 }}>
+            <Stepper activeStep={activeStep} alternativeLabel>
+              {steps.slice(0, 4).map((step, index) => (
+                <Step key={step.id} completed={activeStep > index}>
+                  <StepLabel>{step.label}</StepLabel>
+                </Step>
+              ))}
+            </Stepper>
+          </Box>
+        </>
+      )}
 
       <Paper 
-        elevation={2} 
+        elevation={activeStep < 4 ? 2 : 0}
         sx={{ 
           p: 3, 
           mb: 4, 
           borderRadius: 2,
           transition: 'all 0.3s',
-          animation: 'fadeIn 0.5s'
+          animation: 'fadeIn 0.5s',
+          backgroundColor: activeStep === 4 ? 'transparent' : 'background.paper',
+          boxShadow: activeStep === 4 ? 'none' : undefined
         }}
       >
         {renderStepContent()}
       </Paper>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-        <Button
-          variant="outlined"
-          onClick={handleBack}
-          startIcon={<ArrowBackIcon />}
-          disabled={activeStep === 0}
-          sx={{ px: 3 }}
-        >
-          Back
-        </Button>
+      {activeStep < 4 && (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={handleBack}
+            startIcon={<ArrowBackIcon />}
+            disabled={activeStep === 0}
+            sx={{ px: 3 }}
+          >
+            Back
+          </Button>
 
-        <Box>
-          {activeStep === steps.length - 1 ? (
-            <>
-              <Button
-                variant="outlined"
-                onClick={() => handleSaveJob('Draft')}
-                startIcon={<SaveIcon />}
-                sx={{ mr: 2 }}
-              >
-                Save as Draft
-              </Button>
+          <Box>
+            {activeStep === steps.length - 2 ? (
+              <>
+                <Button
+                  variant="outlined"
+                  onClick={() => handleSaveJob('Draft')}
+                  startIcon={<SaveIcon />}
+                  sx={{ mr: 2 }}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save as Draft'}
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => handleSaveJob('Published')}
+                  startIcon={<PublishIcon />}
+                  color="primary"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Publishing...' : 'Publish Job'}
+                </Button>
+              </>
+            ) : (
               <Button
                 variant="contained"
-                onClick={() => handleSaveJob('Published')}
-                startIcon={<PublishIcon />}
+                onClick={handleNext}
+                endIcon={<ArrowForwardIcon />}
                 color="primary"
+                sx={{ px: 3 }}
               >
-                Publish Job
+                {activeStep === 2 ? 'Preview' : 'Next'}
               </Button>
-            </>
-          ) : (
-            <Button
-              variant="contained"
-              onClick={handleNext}
-              endIcon={<ArrowForwardIcon />}
-              color="primary"
-              sx={{ px: 3 }}
-            >
-              {activeStep === 2 ? 'Preview' : 'Next'}
-            </Button>
-          )}
+            )}
+          </Box>
         </Box>
-      </Box>
+      )}
     </Container>
   );
 };

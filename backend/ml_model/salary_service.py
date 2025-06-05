@@ -3,17 +3,11 @@ import pandas as pd
 import cloudpickle
 import sys
 import os
+import traceback
 from .multi_layer_perceptron import CustomNeuralNetRegressor, Model, TensorTransformer
-import logging
 import socket
-try:
-    from careerjet_api_client import CareerjetAPIClient
-    CAREERJET_AVAILABLE = True
-except ImportError:
-    CAREERJET_AVAILABLE = False
-    logging.warning("CareerjetAPIClient not found, using mock implementation for similar jobs")
-
-logger = logging.getLogger(__name__)
+from careerjet_api_client import CareerjetAPIClient
+from . import salary
 
 class SalaryPredictionService:
     def __init__(self):
@@ -36,17 +30,23 @@ class SalaryPredictionService:
             
             # Check if model files exist
             if not all(p.exists() for p in [preprocessor_path, model_path, industries_path]):
-                logger.error("Model files not found. Please make sure to copy the model files to the appropriate directories.")
                 return False
             
+            # Temporarily add the current module's directory to sys.path
+            # to help cloudpickle find the custom 'salary' module if it was pickled as a top-level module.
+            module_dir_path = str(self._current_dir) # self._current_dir is Path(__file__).parent
+            sys.path.insert(0, module_dir_path)
+
             # Load preprocessor
-            logger.info("Loading preprocessor...")
-            with open(preprocessor_path, 'rb') as f:
-                self.preprocessor = cloudpickle.load(f)
-            logger.info("Preprocessor loaded successfully")
+            try:
+                with open(preprocessor_path, 'rb') as f:
+                    self.preprocessor = cloudpickle.load(f)
+            finally:
+                # Always remove the path after attempting to load, to avoid polluting sys.path
+                if sys.path[0] == module_dir_path:
+                    sys.path.pop(0)
 
             # Initialize neural network
-            logger.info("Initializing neural network...")
             self.model = CustomNeuralNetRegressor(
                 Model,
                 device='cpu',
@@ -61,12 +61,9 @@ class SalaryPredictionService:
                 }
             )
             self.model.initialize()
-            logger.info("Neural network initialized")
             
             # Load model parameters
-            logger.info("Loading model parameters...")
             self.model.load_params(str(model_path))
-            logger.info("Model parameters loaded successfully")
             
             # Load company industries data
             df_company_industries = pd.read_csv(industries_path)
@@ -76,7 +73,6 @@ class SalaryPredictionService:
             return True
             
         except Exception as e:
-            logger.error(f"Error initializing salary prediction service: {e}")
             return False
         
     def predict(self, job_data):
@@ -144,7 +140,6 @@ class SalaryPredictionService:
             return result
             
         except Exception as e:
-            logger.error(f"Error making prediction: {e}")
             return {
                 "success": False,
                 "error": str(e)
@@ -161,10 +156,6 @@ class SalaryPredictionService:
             list: Similar job listings
         """
         try:
-            # Check if CareerjetAPI is available
-            if not CAREERJET_AVAILABLE:
-                return self._get_mock_similar_jobs(job_data)
-                
             # Extract data
             title = job_data.get('title', '')
             location = job_data.get('location', 'USA')
@@ -187,7 +178,7 @@ class SalaryPredictionService:
             # Create search query
             search_params = {
                 'location': location or 'USA',
-                'keywords': keywords or title,
+                'keywords': title + (", " + keywords if keywords else ""),
                 'affid': '602e3a71903dec4ef6402764959a6f8c',  # Use the provided affiliate ID
                 'user_ip': local_ip,
                 'url': f'http://localhost/jobsearch?q={title}&l={location}',
@@ -249,60 +240,18 @@ class SalaryPredictionService:
                         'skills': skills or ["Not specified"]
                     }
                     
-                    # Add salary only if we have valid values
+                    # Add salary to job_obj only if both min and max are valid
                     if salary_min is not None and salary_max is not None:
-                        job_obj['salary'] = {
-                            'min': salary_min,
-                            'max': salary_max
-                        }
+                        job_obj['salary'] = {'min': salary_min, 'max': salary_max}
                     
                     similar_jobs.append(job_obj)
                     
-                return similar_jobs
-            else:
-                # Fall back to mock data if no results
-                return self._get_mock_similar_jobs(job_data)
+            # Return all processed jobs if any were found, or an empty list if 'jobs' was missing/empty initially
+            return similar_jobs
                 
         except Exception as e:
-            logger.error(f"Error fetching similar jobs: {e}")
-            # Fall back to mock implementation on error
-            return self._get_mock_similar_jobs(job_data)
-            
-    def _get_mock_similar_jobs(self, job_data):
-        """Mock implementation for similar jobs when CareerjetAPI fails or is unavailable"""
-        companies = ['Google', 'Microsoft', 'Amazon', 'Apple', 'Facebook', 'Netflix']
-        locations = ['New York', 'San Francisco', 'Seattle', 'Austin', 'Boston', 'Remote']
-        skills = ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'AWS', 'Docker']
-        
-        title = job_data.get('title', '')
-        location = job_data.get('location', 'Remote')
-        job_skills = job_data.get('skills', [])
-        
-        # Generate 3 mock job listings
-        similar_jobs = []
-        for i in range(3):
-            # Pick a random set of skills (2-4)
-            num_skills = min(4, max(2, len(job_skills) if isinstance(job_skills, list) else 0))
-            job_skills_list = job_skills[:num_skills] if job_skills and isinstance(job_skills, list) else skills[:3]
-            
-            # Generate monthly salary ranges
-            base_salary_monthly = 7 + i  # Monthly in thousands
-            if 'senior' in title.lower() or 'lead' in title.lower():
-                base_salary_monthly += 3
-                
-            similar_jobs.append({
-                'title': title,
-                'company': companies[i % len(companies)],
-                'location': location or locations[i % len(locations)],
-                'salary': {
-                    'min': base_salary_monthly,
-                    'max': base_salary_monthly + 3
-                },
-                'url': '#',
-                'skills': job_skills_list
-            })
-            
-        return similar_jobs
+            # Raising the exception to be handled by the route
+            raise RuntimeError(f"Error fetching or processing similar jobs from Careerjet: {e}")
 
 
 # Singleton instance

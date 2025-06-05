@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -14,13 +14,22 @@ import {
   FormControl,
   FormLabel,
   InputAdornment,
-  Paper,
-  List,
-  ListItem,
-  ListItemText,
   Chip,
-  Divider
+  Divider,
+  Card,
+  CardHeader,
+  CardContent,
+  CardActions,
+  Avatar,
+  Tooltip,
+  Badge
 } from '@mui/material';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import WorkIcon from '@mui/icons-material/Work';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import BusinessCenterIcon from '@mui/icons-material/BusinessCenter';
 import { getSalaryPrediction, getSimilarJobs } from '../../utils/salaryPredictionService';
 
 const SalaryInsightsForm = ({ formData, onChange }) => {
@@ -33,12 +42,67 @@ const SalaryInsightsForm = ({ formData, onChange }) => {
   const [similarJobs, setSimilarJobs] = useState([]);
   const [error, setError] = useState(null);
 
+  // Store the base yearly 'k' prediction to facilitate format changes
+  const [baseYearlyPredictionK, setBaseYearlyPredictionK] = useState(null);
+
+  // Memoize handleGenerateInsights to stabilize its reference for useEffect
+  const handleGenerateInsights = useCallback(async () => {
+    if (!formData.title) {
+      setError("Please provide a job title before generating insights");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const prediction = await getSalaryPrediction(formData);
+      const jobsData = await getSimilarJobs(formData);
+      
+      const yearlyKPointEstimate = prediction.salaryValue; 
+      setBaseYearlyPredictionK(yearlyKPointEstimate); 
+
+      let initialMinK, initialMaxK;
+      if (isMonthly) { 
+        initialMinK = Math.round((yearlyKPointEstimate / 12) * 0.90); 
+        initialMaxK = Math.round((yearlyKPointEstimate / 12) * 1.10); 
+      } else {
+        initialMinK = Math.round(yearlyKPointEstimate * 0.90); 
+        initialMaxK = Math.round(yearlyKPointEstimate * 1.10); 
+      }
+      
+      setPredictionResults(prediction); 
+      setMinSalary(initialMinK);
+      setMaxSalary(initialMaxK);
+      
+      onChange('salary', {
+        min: initialMinK,
+        max: initialMaxK,
+        suggested: {
+            yearlyK: yearlyKPointEstimate,
+            formattedValue: prediction.estimatedSalary,
+            derivedMinK: initialMinK,
+            derivedMaxK: initialMaxK
+        },
+        isMonthly: isMonthly
+      });
+      
+      setSimilarJobs(jobsData || []);
+      onChange('similarJobs', jobsData || []);
+      setInsightsGenerated(true);
+    } catch (err) {
+      console.error("Error generating insights:", err);
+      setError("An error occurred while generating salary insights. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  }, [formData, isMonthly, onChange]);
+
   useEffect(() => {
-    // If we have a job title or skills and haven't generated insights yet, do so
     if (!insightsGenerated && (formData.title || (formData.skills && formData.skills.length > 0))) {
       handleGenerateInsights();
     }
-  }, []);
+  }, [formData.title, formData.skills, insightsGenerated, handleGenerateInsights]);
 
   const handleSalaryChange = () => {
     // Update the parent component with new salary data
@@ -61,72 +125,63 @@ const SalaryInsightsForm = ({ formData, onChange }) => {
   };
 
   const handleSalaryFormat = (event) => {
-    const isMonthlyFormat = event.target.value === 'monthly';
-    setIsMonthly(isMonthlyFormat);
-    onChange('salary', {
-      ...formData.salary,
-      isMonthly: isMonthlyFormat
-    });
-  };
+    const newIsMonthly = event.target.value === 'monthly';
+    const oldIsMonthly = isMonthly; // Get the current format before changing state
 
-  const handleGenerateInsights = async () => {
-    if (!formData.title) {
-      setError("Please provide a job title before generating insights");
-      return;
-    }
+    setIsMonthly(newIsMonthly); // Update the format state immediately
 
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Get salary prediction from the API
-      const prediction = await getSalaryPrediction(formData);
-      
-      // Get similar jobs
-      const jobsData = await getSimilarJobs(formData);
-      
-      // Use the predicted salary as the midpoint
-      const predictedSalaryValue = prediction.salaryValue;
-      const minPredicted = Math.round(predictedSalaryValue * 0.9);
-      const maxPredicted = Math.round(predictedSalaryValue * 1.1);
-      
-      setPredictionResults({
-        estimatedSalary: prediction.estimatedSalary,
-        minSalary: minPredicted,
-        maxSalary: maxPredicted,
-        isMonthly: prediction.isMonthly
+    // Get current values from state (which reflect user input)
+    const currentMinValK = parseFloat(minSalary);
+    const currentMaxValK = parseFloat(maxSalary);
+
+    let newMinConvertedK = currentMinValK;
+    let newMaxConvertedK = currentMaxValK;
+
+    // Only convert if the format actually changed and values are numbers
+    if (oldIsMonthly !== newIsMonthly && !isNaN(currentMinValK) && !isNaN(currentMaxValK)) {
+      if (oldIsMonthly === true && newIsMonthly === false) { // Monthly to Yearly
+        newMinConvertedK = Math.round(currentMinValK * 12);
+        newMaxConvertedK = Math.round(currentMaxValK * 12);
+      } else if (oldIsMonthly === false && newIsMonthly === true) { // Yearly to Monthly
+        newMinConvertedK = currentMinValK === 0 ? 0 : Math.round(currentMinValK / 12);
+        newMaxConvertedK = currentMaxValK === 0 ? 0 : Math.round(currentMaxValK / 12);
+      }
+      setMinSalary(newMinConvertedK);
+      setMaxSalary(newMaxConvertedK);
+      onChange('salary', { 
+        min: newMinConvertedK, 
+        max: newMaxConvertedK, 
+        // suggested can hold the AI point estimate if needed, or be derived. 
+        // For now, it mirrors min/max of user inputs.
+        suggested: { min: newMinConvertedK, max: newMaxConvertedK }, 
+        isMonthly: newIsMonthly 
       });
-      
-      setMinSalary(minPredicted);
-      setMaxSalary(maxPredicted);
-      
-      // Update parent component with new data
+    } else if (oldIsMonthly === newIsMonthly) {
+      // If format didn't change (e.g. re-clicking same radio), ensure parent is synced with current state
+      onChange('salary', { 
+          min: currentMinValK, 
+          max: currentMaxValK, 
+          suggested: { min: currentMinValK, max: currentMaxValK },
+          isMonthly: newIsMonthly 
+      });
+    } else {
+      // If values are not numbers (e.g. initial state before insights), just update format in parent
       onChange('salary', {
-        min: minPredicted,
-        max: maxPredicted,
-        suggested: {
-          min: minPredicted,
-          max: maxPredicted
-        },
-        isMonthly: prediction.isMonthly
+        ...formData.salary,
+        min: currentMinValK, // or some default like 0 if NaN
+        max: currentMaxValK, // or some default like 0 if NaN
+        isMonthly: newIsMonthly
       });
-      
-      setSimilarJobs(jobsData);
-      onChange('similarJobs', jobsData);
-      
-      setInsightsGenerated(true);
-    } catch (error) {
-      console.error("Error generating insights:", error);
-      setError("An error occurred while generating salary insights. Please try again later.");
-    } finally {
-      setLoading(false);
     }
   };
 
-  const formatCurrency = (value) => {
-    return isMonthly
-      ? `$${value}k/month`
-      : `$${value * 12}k/year`;
+  // Helper function to format salary type
+  const formatSalaryType = (type) => {
+    if (!type || typeof type !== 'string' || type.toLowerCase() === 'not specified' || type.toLowerCase() === 'unknown' || type.trim() === '') {
+      return '';
+    }
+    // Capitalize first letter
+    return ` (${type.charAt(0).toUpperCase() + type.slice(1).toLowerCase()})`;
   };
 
   return (
@@ -155,12 +210,14 @@ const SalaryInsightsForm = ({ formData, onChange }) => {
       ) : insightsGenerated ? (
         <Box>
           <Alert severity="info" variant="filled" sx={{ mb: 4 }}>
-            <AlertTitle>Suggested Salary Range</AlertTitle>
+            <AlertTitle>
+              AI Salary Estimate
+            </AlertTitle>
             <Typography variant="h6">
-              {formatCurrency(minSalary)} - {formatCurrency(maxSalary)}
+              {predictionResults?.estimatedSalary || "Calculating..."}
             </Typography>
             <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-              This prediction is based on machine learning analysis of similar job postings.
+              This estimate is based on AI analysis of this job's details.
             </Typography>
           </Alert>
 
@@ -215,31 +272,159 @@ const SalaryInsightsForm = ({ formData, onChange }) => {
                 Similar Jobs
               </Typography>
               <Grid container spacing={2}>
-                {similarJobs.slice(0, 3).map((job, index) => (
+                {similarJobs.slice(0, 5).map((job, index) => (
                   <Grid item xs={12} sm={6} md={4} key={index}>
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                      <Typography variant="subtitle2" gutterBottom>{job.title}</Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {job.company} · {job.location}
-                      </Typography>
-                      {job.salary && (
-                        <Typography variant="body2" color="primary.main" gutterBottom>
-                          ${job.salary.min}k - ${job.salary.max}k
-                        </Typography>
-                      )}
-                      {job.skills && job.skills.length > 0 && (
-                        <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {job.skills.map((skill, i) => (
+                    <Card 
+                      variant="outlined" 
+                      sx={{ 
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        width: '100%',
+                        maxHeight: 200
+                      }}
+                    >
+                      <Box sx={{ 
+                        display: 'flex', 
+                        p: 2, 
+                        pb: 1,
+                        alignItems: 'center'
+                      }}>
+                        <Avatar 
+                          sx={{ 
+                            bgcolor: index === 0 ? 'secondary.main' : 'primary.main',
+                            width: 38,
+                            height: 38,
+                            mr: 2
+                          }}
+                        >
+                          {job.company ? job.company.charAt(0).toUpperCase() : 'J'}
+                        </Avatar>
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Typography 
+                              variant="subtitle2" 
+                              sx={{ 
+                                fontWeight: 'bold',
+                                maxWidth: '85%',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {job.title || "N/A"}
+                            </Typography>
+                            {index === 0 && (
+                              <Chip
+                                label="Best Fit"
+                                color="secondary"
+                                size="small"
+                                sx={{ ml: 1, height: 20, fontSize: '0.65rem' }}
+                              />
+                            )}
+                          </Box>
+                          <Typography 
+                            variant="body2" 
+                            color="text.secondary"
+                            sx={{
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {job.company || "N/A"}
+                          </Typography>
+                        </Box>
+                      </Box>
+                      
+                      <Box sx={{ 
+                        px: 2, 
+                        pb: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 0.5
+                      }}>
+                        {job.location && (
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <LocationOnIcon fontSize="small" sx={{ mr: 0.5, color: 'text.secondary', fontSize: '1rem' }} />
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                              {job.location}
+                            </Typography>
+                          </Box>
+                        )}
+                        
+                        {job.salary && job.salary.min && job.salary.max && (
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <MonetizationOnIcon fontSize="small" sx={{ mr: 0.5, color: 'success.main', fontSize: '1rem' }} />
+                            <Typography variant="body2" fontWeight="medium" color="success.main">
+                              ${job.salary.min}k - ${job.salary.max}k{job.salary.type && formatSalaryType(job.salary.type)}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+
+                      {job.skills && job.skills.length > 0 && job.skills[0] !== "Not specified" && (
+                        <Box sx={{ px: 2, pb: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {job.skills.slice(0, 3).map((skill, i) => (
                             <Chip
                               key={i}
                               label={skill}
                               size="small"
-                              variant="outlined"
+                              sx={{ 
+                                height: 20, 
+                                fontSize: '0.7rem' 
+                              }}
                             />
                           ))}
+                          {job.skills.length > 3 && (
+                            <Chip
+                              label={`+${job.skills.length - 3}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                height: 20,
+                                fontSize: '0.7rem'
+                              }}
+                            />
+                          )}
                         </Box>
                       )}
-                    </Paper>
+                      
+                      <Box sx={{ flexGrow: 1 }} />
+                      
+                      <Box 
+                        sx={{ 
+                          borderTop: '1px solid', 
+                          borderColor: 'divider',
+                          px: 2,
+                          py: 1,
+                          mt: 'auto',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary">
+                          Similar position
+                        </Typography>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="primary"
+                          sx={{ 
+                            py: 0,
+                            height: 24,
+                            minWidth: 60,
+                            fontSize: '0.7rem'
+                          }}
+                          href={job.url || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View
+                        </Button>
+                      </Box>
+                    </Card>
                   </Grid>
                 ))}
               </Grid>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import SalaryInsightsForm from './SalaryInsightsForm';
+import SalaryInsightsForm from './JobCreationWizard/SalaryInsightsForm';
+import JobPreview from './JobCreationWizard/JobPreview';
+import JobSuccessPage from './JobCreationWizard/JobSuccessPage';
 import { createInitialJob } from '../types/Job';
-import axiosInstance from '../utils/axios_instance';
-import { urls } from '../utils/config';
+import { createJob } from '../utils/jobService';
 import './JobCreationWizard.css';
 
 // Define wizard steps
@@ -11,12 +12,15 @@ const STEPS = [
   { id: 'details', name: 'Job Details' },
   { id: 'requirements', name: 'Requirements' },
   { id: 'salary', name: 'Salary Insights' },
-  { id: 'preview', name: 'Preview' }
+  { id: 'preview', name: 'Preview' },
+  { id: 'success', name: 'Success' }
 ];
 
 const JobCreationWizard = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [job, setJob] = useState(createInitialJob());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
   const navigate = useNavigate();
 
   // Update job data
@@ -67,14 +71,30 @@ const JobCreationWizard = () => {
       status
     };
     
+    setIsSubmitting(true);
+    
     try {
-      const response = await axiosInstance.post(urls.JOB_CREATE, jobData);
-      console.log("Job saved:", response.data);
-      navigate('/jobs/employer');
+      const result = await createJob(jobData);
+      console.log("Job saved:", result);
+      
+      setSubmissionResult(result);
+      if (result.success) {
+        // Move to success step
+        setCurrentStep(4); // Index of the success step
+      }
     } catch (error) {
       console.error("Error saving job:", error);
       alert("There was an error saving the job. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
+  };
+
+  // Handle creating another job
+  const handleCreateAnother = () => {
+    setJob(createInitialJob());
+    setSubmissionResult(null);
+    setCurrentStep(0);
   };
 
   // Render job details step
@@ -337,84 +357,35 @@ const JobCreationWizard = () => {
       <div className="card-body">
         <h3 className="card-title mb-4">Job Preview</h3>
         
-        <div className="p-4 border rounded bg-light mb-4">
-          <h2 className="mb-3">{job.title || "Job Title"}</h2>
-          
-          <div className="d-flex flex-wrap gap-3 mb-3">
-            {job.department && (
-              <span className="badge bg-secondary">{job.department}</span>
-            )}
-            {job.location && (
-              <span className="badge bg-secondary">{job.location}</span>
-            )}
-            {job.type && (
-              <span className="badge bg-secondary">{job.type}</span>
-            )}
-            {job.experience && (
-              <span className="badge bg-secondary">{job.experience}</span>
-            )}
-            {job.salary && job.salary.min > 0 && job.salary.max > 0 && (
-              <span className="badge bg-success">
-                ${job.salary.min}k - ${job.salary.max}k {job.salary.isMonthly ? '/month' : '/year'}
-              </span>
-            )}
-          </div>
-          
-          <div className="mb-4">
-            <h5>Description</h5>
-            <p>{job.description || "No description provided."}</p>
-          </div>
-          
-          {job.skills.length > 0 && (
-            <div className="mb-4">
-              <h5>Required Skills</h5>
-              <div className="d-flex flex-wrap gap-2">
-                {job.skills.map((skill, index) => (
-                  <span key={index} className="badge bg-primary">{skill}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {job.responsibilities.length > 0 && (
-            <div className="mb-4">
-              <h5>Responsibilities</h5>
-              <ul>
-                {job.responsibilities.map((responsibility, index) => (
-                  <li key={index}>{responsibility}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          
-          {job.qualifications.length > 0 && (
-            <div>
-              <h5>Qualifications</h5>
-              <ul>
-                {job.qualifications.map((qualification, index) => (
-                  <li key={index}>{qualification}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
+        <JobPreview job={job} />
         
-        <div className="d-flex justify-content-center gap-3">
+        <div className="d-flex justify-content-center gap-3 mt-4">
           <button 
             className="btn btn-outline-primary"
             onClick={() => handleSaveJob('Draft')}
+            disabled={isSubmitting}
           >
-            Save as Draft
+            {isSubmitting ? 'Saving...' : 'Save as Draft'}
           </button>
           <button 
             className="btn btn-primary"
             onClick={() => handleSaveJob('Published')}
+            disabled={isSubmitting}
           >
-            Publish Job
+            {isSubmitting ? 'Publishing...' : 'Publish Job'}
           </button>
         </div>
       </div>
     </div>
+  );
+  
+  // Render success step
+  const renderSuccessStep = () => (
+    <JobSuccessPage 
+      jobId={submissionResult?.jobId} 
+      onViewJob={() => navigate(`/jobs/${submissionResult?.jobId}`)} 
+      onCreateAnother={handleCreateAnother} 
+    />
   );
 
   // Render current step content
@@ -428,6 +399,8 @@ const JobCreationWizard = () => {
         return renderSalaryInsightsStep();
       case 3:
         return renderPreviewStep();
+      case 4:
+        return renderSuccessStep();
       default:
         return null;
     }
@@ -454,53 +427,57 @@ const JobCreationWizard = () => {
         <p className="text-muted">Fill in the details to create a new job posting</p>
       </div>
       
-      {/* Progress steps */}
-      <div className="mb-4">
-        <div className="d-flex justify-content-between steps">
-          {STEPS.map((step, index) => (
-            <div 
-              key={index}
-              className={`step-item ${index <= currentStep ? 'active' : ''} ${index < currentStep ? 'complete' : ''}`}
-              style={{ flex: 1, textAlign: 'center' }}
-            >
+      {/* Progress steps - hide on success step */}
+      {currentStep < 4 && (
+        <div className="mb-4">
+          <div className="d-flex justify-content-between steps">
+            {STEPS.slice(0, 4).map((step, index) => (
               <div 
-                className="step-circle"
-                onClick={() => index <= currentStep && setCurrentStep(index)}
-                style={{ cursor: index <= currentStep ? 'pointer' : 'not-allowed' }}
+                key={index}
+                className={`step-item ${index <= currentStep ? 'active' : ''} ${index < currentStep ? 'complete' : ''}`}
+                style={{ flex: 1, textAlign: 'center' }}
               >
-                {index + 1}
+                <div 
+                  className="step-circle"
+                  onClick={() => index <= currentStep && setCurrentStep(index)}
+                  style={{ cursor: index <= currentStep ? 'pointer' : 'not-allowed' }}
+                >
+                  {index + 1}
+                </div>
+                <div className="step-text mt-2">{step.name}</div>
               </div>
-              <div className="step-text mt-2">{step.name}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
       
       {/* Step content */}
       <div className="mb-4">
         {renderStepContent()}
       </div>
       
-      {/* Navigation buttons */}
-      <div className="d-flex justify-content-between mt-4">
-        <button 
-          className="btn btn-outline-secondary"
-          onClick={handlePrevious}
-          disabled={currentStep === 0}
-        >
-          Previous
-        </button>
-        
-        {currentStep < STEPS.length - 1 ? (
+      {/* Navigation buttons - hide on success step */}
+      {currentStep < 4 && (
+        <div className="d-flex justify-content-between mt-4">
           <button 
-            className="btn btn-primary"
-            onClick={handleNext}
-            disabled={!isStepValid()}
+            className="btn btn-outline-secondary"
+            onClick={handlePrevious}
+            disabled={currentStep === 0}
           >
-            {currentStep === 2 ? 'Preview' : 'Next'}
+            Previous
           </button>
-        ) : null}
-      </div>
+          
+          {currentStep < 3 ? (
+            <button 
+              className="btn btn-primary"
+              onClick={handleNext}
+              disabled={!isStepValid()}
+            >
+              Next
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
