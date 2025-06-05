@@ -211,3 +211,7 @@ $RECYCLE.BIN/
 .turbo
 .vercel
 
+# Local Supabase
+.branches
+.temp
+

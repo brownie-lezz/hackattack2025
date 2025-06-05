@@ -1,30 +1,35 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { Navigate, Link } from "react-router-dom";
-import axiosInstance from "../../utils/axios_instance";
-import {auth_urls} from "../../utils/config"
+import AuthContext from "../../context/AuthContext";
 
 const ResetPassword = () => {
+  const { resetPassword } = useContext(AuthContext);
   const [requestSent, setRequestSent] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) {
       setError("Email is required.");
       return;
     }
 
-    axiosInstance
-      .post(auth_urls.RESET_PASSWORD, { email })
-      .then((res) => setRequestSent(true))
-      .catch((err) => {
-        //   console.log(err);
-        if (err.response.data.email) setError(err.response.data.email[0]);
-        else setError("Email is invalid.");
-      });
-    setEmail("");
-    setError("");
+    try {
+      setLoading(true);
+      const { error } = await resetPassword(email);
+      
+      if (error) throw error;
+      
+      setRequestSent(true);
+      setError("");
+    } catch (err) {
+      console.error("Error resetting password:", err);
+      setError(err.message || "Failed to send reset password email.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (requestSent) return <Navigate to="/" />;
@@ -67,8 +72,9 @@ const ResetPassword = () => {
                     className="btn btn-outline-light btn-lg px-5"
                     type="submit"
                     onClick={handleSubmit}
+                    disabled={loading}
                   >
-                    Reset Password
+                    {loading ? "Sending..." : "Reset Password"}
                   </button>
                 </div>
 
