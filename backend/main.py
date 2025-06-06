@@ -1,7 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
-from flask import Flask, jsonify, send_from_directory, request
-from flask_cors import CORS
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Optional
 import json
@@ -29,6 +29,15 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# Create necessary directories
+os.makedirs("images", exist_ok=True)
+os.makedirs("parsed_resumes", exist_ok=True)
+os.makedirs("Original_Resumes", exist_ok=True)
+os.makedirs("Job_Description", exist_ok=True)
+
+# Mount static files directory
+app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # Local Mistral configuration
 LOCAL_MISTRAL_URL = "http://localhost:11434/api/generate"  # Default Ollama endpoint
@@ -813,48 +822,33 @@ async def generate_questions(request: QuestionGenerationRequest):
     except Exception as e:
         print(f"Error in generate_questions: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-CORS(app, 
-     resources={r"/*": {"origins": "*"}}, 
-     supports_credentials=True,
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
-     methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"])
 
-# Create static folder if it doesn't exist
-os.makedirs(os.path.join(os.path.dirname(__file__), 'static', 'images'), exist_ok=True)
+@app.get('/favicon.ico')
+async def favicon():
+    return FileResponse('favicon.ico')
 
-# Favicon routes
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'),
-                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+@app.get('/images/{filename}')
+async def serve_image(filename: str):
+    return FileResponse(f'images/{filename}')
 
-@app.route('/images/<path:filename>')
-def serve_image(filename):
-    return send_from_directory(os.path.join(app.root_path, 'static', 'images'),
-                               filename)
+@app.get('/')
+async def index():
+    return {"message": "Welcome to the API"}
 
-# Root endpoint for health check
-@app.route('/')
-def index():
-    return jsonify({
-        "status": "ok",
-        "message": "Backend API is running"
-    })
+@app.options('/{path:path}')
+async def handle_options(path: str):
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        }
+    )
 
-# Global OPTIONS handler for preflight checks - removed manual CORS headers
-@app.route('/', defaults={'path': ''}, methods=['OPTIONS'])
-@app.route('/<path:path>', methods=['OPTIONS'])
-def handle_options(path):
-    return app.make_default_options_response()
-
-# Direct test endpoint - removed manual CORS headers
-@app.route('/api/test', methods=['GET', 'OPTIONS'])
-def test_endpoint():
-    """Simple test endpoint for debugging"""
-    if request.method == 'OPTIONS':
-        return app.make_default_options_response()
-        
-    return jsonify({'status': 'success', 'message': 'Test endpoint working from main.py'})
+@app.get('/api/test')
+async def test_endpoint():
+    return {"message": "Test endpoint working"}
 
 try:
     # Try to import ML modules

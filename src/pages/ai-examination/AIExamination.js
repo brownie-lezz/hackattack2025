@@ -70,48 +70,55 @@ const AIExamination = () => {
     if (mediaStream && videoRef.current) {
       console.log("Setting up video element with media stream");
 
-      // Set up video element
-      videoRef.current.srcObject = mediaStream;
-
-      // Add event listeners for better state tracking
       const videoElement = videoRef.current;
+      videoElement.srcObject = mediaStream;
 
-      const handleCanPlay = () => {
-        console.log("Video can play");
-        videoElement.play()
-          .then(() => {
-            console.log("Video playback started");
-            setVideoError(null);
-            setIsVideoReady(true);
-            setCurrentQuestion(0);
-          })
-          .catch(error => {
-            console.error("Error playing video:", error);
-            setVideoError("Error starting video: " + error.message);
-            setIsVideoReady(false);
-          });
+      // Simplified video setup with immediate play attempt
+      const setupVideo = async () => {
+        try {
+          // Try to play immediately
+          await videoElement.play();
+          console.log("Video playback started immediately");
+          setVideoError(null);
+          setIsVideoReady(true);
+          setCurrentQuestion(0);
+        } catch (error) {
+          console.error("Error playing video:", error);
+          // If immediate play fails, wait for canplay event
+          videoElement.addEventListener('canplay', () => {
+            videoElement.play()
+              .then(() => {
+                console.log("Video playback started after canplay");
+                setVideoError(null);
+                setIsVideoReady(true);
+                setCurrentQuestion(0);
+              })
+              .catch(error => {
+                console.error("Error playing video after canplay:", error);
+                setVideoError("Error starting video: " + error.message);
+                setIsVideoReady(false);
+              });
+          }, { once: true }); // Use once: true to automatically remove the listener
+        }
       };
 
+      setupVideo();
+
+      // Add error handler
       const handleError = (error) => {
         console.error("Video error:", error);
         setVideoError("Error with video: " + error.message);
         setIsVideoReady(false);
       };
 
-      // Add event listeners
-      videoElement.addEventListener('canplay', handleCanPlay);
       videoElement.addEventListener('error', handleError);
-
-      // Try to play immediately
-      handleCanPlay();
 
       // Cleanup
       return () => {
-        videoElement.removeEventListener('canplay', handleCanPlay);
         videoElement.removeEventListener('error', handleError);
       };
     }
-  }, [mediaStream, videoRef.current]);
+  }, [mediaStream]);
 
   // Effect to handle video element mounting
   useEffect(() => {
@@ -127,10 +134,11 @@ const AIExamination = () => {
       if (isStarting && !mediaStream && mounted) {
         try {
           console.log("Requesting media stream...");
+          // Request lower resolution for faster initialization
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
+              width: { ideal: 640 }, // Reduced from 1280
+              height: { ideal: 480 }, // Reduced from 720
               facingMode: "user"
             },
             audio: true
@@ -370,6 +378,25 @@ const AIExamination = () => {
       setIsStarting(true);
       setVideoError(null);
 
+      // Start requesting media stream immediately with lower resolution
+      if (!mediaStream) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 640 }, // Reduced from 1280
+              height: { ideal: 480 }, // Reduced from 720
+              facingMode: "user"
+            },
+            audio: true
+          });
+          setMediaStream(stream);
+        } catch (error) {
+          console.error("Error accessing media devices:", error);
+          setVideoError("Error accessing camera and microphone: " + error.message);
+          setIsStarting(false);
+        }
+      }
+
     } catch (error) {
       console.error('Error starting examination:', error);
       setVideoError(`Error starting examination: ${error.message}`);
@@ -415,14 +442,16 @@ const AIExamination = () => {
                 <>
                   <div className="alert alert-info mb-4">
                     <h4 className="alert-heading">Ready to Begin?</h4>
-                    <p>This AI examination will assess your skills and experience through a series of questions.</p>
-                    <hr />
-                    <p className="mb-0">Please ensure you have:</p>
-                    <ul className="list-unstyled">
-                      <li>✓ A quiet environment</li>
-                      <li>✓ A working camera and microphone</li>
-                      <li>✓ At least 30 minutes of uninterrupted time</li>
-                    </ul>
+                    <div>
+                      <p>This AI examination will assess your skills and experience through a series of questions.</p>
+                      <hr />
+                      <p className="mb-0">Please ensure you have:</p>
+                      <ul className="list-unstyled">
+                        <li>✓ A quiet environment</li>
+                        <li>✓ A working camera and microphone</li>
+                        <li>✓ At least 30 minutes of uninterrupted time</li>
+                      </ul>
+                    </div>
                   </div>
 
                   <button
@@ -443,9 +472,11 @@ const AIExamination = () => {
               ) : isCompleted ? (
                 <div className="text-center">
                   <h3 className="text-success mb-3">Examination Completed!</h3>
-                  <p>Thank you for completing the AI examination.</p>
-                  <p>Your responses have been recorded.</p>
-                  <p className="mb-4">Shortlisted candidates will be notified to move to the next step.</p>
+                  <div>
+                    <p>Thank you for completing the AI examination.</p>
+                    <p>Your responses have been recorded.</p>
+                    <p className="mb-4">Shortlisted candidates will be notified to move to the next step.</p>
+                  </div>
                   <button
                     className="btn btn-primary btn-lg px-5"
                     onClick={() => navigate('/')}
@@ -553,24 +584,24 @@ const AIExamination = () => {
                         <span className="visually-hidden">Loading...</span>
                       </div>
                       <h4>Preparing your session...</h4>
-                      <p className="text-muted">
+                      <div className="text-muted">
                         {isVideoReady ? 'Video is ready!' : 'Initializing video...'}
-                      </p>
+                      </div>
                       {!mediaStream && (
-                        <p className="text-muted">
+                        <div className="text-muted">
                           <div className="spinner-border spinner-border-sm me-2" role="status">
                             <span className="visually-hidden">Loading...</span>
                           </div>
                           Waiting for camera access...
-                        </p>
+                        </div>
                       )}
                       {mediaStream && !isVideoReady && (
-                        <p className="text-muted">
+                        <div className="text-muted">
                           <div className="spinner-border spinner-border-sm me-2" role="status">
                             <span className="visually-hidden">Loading...</span>
                           </div>
                           Camera access granted, setting up video stream...
-                        </p>
+                        </div>
                       )}
                     </>
                   )}
