@@ -1,239 +1,124 @@
-# Supabase Authentication Setup
+# TalentVerse: An AI-Powered Talent Acquisition System
 
-This project uses Supabase for authentication. Follow these steps to set up Supabase authentication for this application.
+TalentVerse is an intelligent, full-stack recruitment platform designed to streamline the hiring process. It leverages multiple AI models to automate resume screening, generate interview questions, and provide real-time market analysis, significantly reducing recruiter workload and improving the accuracy of candidate-job matching.
 
-## 1. Create a Supabase Project
+---
 
-1. Go to [Supabase](https://supabase.com/) and sign up or log in.
-2. Create a new project and note your project URL and anon key.
+## 🎯 Problem Statement
 
-## 2. Configure Environment Variables
+The traditional talent acquisition process is often inefficient due to overwhelming application volumes, spam submissions, and difficulties in matching candidates to roles. This manual process can lead to significant delays, the loss of top talent to competitors, and mismatches between job requirements and compensation. TalentVerse addresses these challenges by introducing a layer of intelligent automation to help recruiters identify the best candidates quickly and effectively.
 
-1. Update the `.env` file in the project root with your Supabase credentials:
+## ✨ Key Features
 
-```
-REACT_APP_SUPABASE_URL=your-supabase-project-url
-REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
+-   **🤖 AI-Powered Resume Screening**:
+    -   Upload multiple resumes (PDF, DOCX, etc.) and match them against a specific job description.
+    -   Leverages a **Mistral LLM** to perform deep semantic analysis of resume content, providing an overall match score and detailed breakdowns for skills, experience, and education.
+    -   Identifies missing skills and flags resumes that appear to be AI-generated to help assess authenticity.
+    -   Includes an interactive chatbot to ask context-aware questions about the analyzed resume content.
 
-## 3. Set Up Database Tables
+-   **🎙️ Automated AI Interview Bot**:
+    -   After passing the initial screening, candidates proceed to an automated video interview.
+    -   Utilizes **Google's Gemini AI** to dynamically generate relevant behavioral and technical questions based on the job description.
+    -   Presents a one-way interview experience where candidates record their answers, which can be reviewed by recruiters later, saving time and standardizing the initial interview process.
 
-1. In the Supabase dashboard, go to the SQL Editor and create the profiles tables:
+-   **📈 Real-Time Market Analysis**:
+    -   Provides AI-powered salary insights based on job title, experience level, and location to help companies offer competitive compensation.
+    -   Fetches and displays similar active job postings by performing a semantic search across the web, giving recruiters immediate market context.
 
-```sql
--- Create profiles table with common fields and specific fields for each role
-CREATE TABLE profiles (
-  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
-  role VARCHAR NOT NULL CHECK (role IN ('seeker', 'employer')),
-  name VARCHAR NOT NULL,
-  email VARCHAR NOT NULL,
-  phone VARCHAR NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+## ⚙️ Tech Stack
 
--- Create seeker profiles table for job seekers
-CREATE TABLE seeker_profiles (
-  id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
-  job_title VARCHAR NOT NULL,
-  experience VARCHAR NOT NULL,
-  skills JSONB NOT NULL,
-  location VARCHAR NOT NULL,
-  resume_url VARCHAR NOT NULL
-);
+| Category      | Technology                                                                                                                                                             | Description                                                                                                                                 |
+| :------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Frontend**  | `React`, `Bootstrap`, `CSS`                                                                                                                                            | A responsive and interactive UI built with React, styled with Bootstrap and custom CSS for a modern user experience.                        |
+| **Backend**   | `FastAPI` (Python)                                                                                                                                                     | A high-performance Python framework serving as the backend API to handle requests and orchestrate AI-driven tasks.                          |
+| **Database**  | `Supabase`                                                                                                                                                             | An open-source Firebase alternative used on the frontend to handle user authentication, session management, and profile data.              |
+| **AI/ML**     | `Mistral LLM`, `Gemini AI`, `PyTorch`, `Sentence Transformers`                                                                                                           | A suite of AI models for resume analysis (Mistral), interview question generation (Gemini), salary prediction, and job similarity (PyTorch). |
+| **External API**| `Careerjet API`                                                                                                                                                        | An external service integrated into the backend to fetch and display additional job listings from across the web.                           |
+| **CI/CD**     | `GitHub`                                                                                                                                                               | The platform used for hosting the project's source code and managing version control with Git.                                              |
 
--- Create employer profiles table for companies
-CREATE TABLE employer_profiles (
-  id UUID REFERENCES profiles(id) ON DELETE CASCADE PRIMARY KEY,
-  industry VARCHAR NOT NULL,
-  company_size VARCHAR NOT NULL,
-  company_website VARCHAR NOT NULL,
-  company_location VARCHAR NOT NULL,
-  company_description TEXT NOT NULL,
-  contact_person VARCHAR NOT NULL
-);
+## 🚀 Getting Started
 
--- Jobs table
-CREATE TABLE jobs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title VARCHAR NOT NULL,
-  description TEXT NOT NULL,
-  required_skills JSONB NOT NULL,
-  company_id UUID NOT NULL REFERENCES profiles(id),
-  company_name VARCHAR NOT NULL,
-  location VARCHAR NOT NULL,
-  salary_range VARCHAR,
-  job_type VARCHAR,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+Follow these instructions to set up and run the project locally.
 
--- Job applications table
-CREATE TABLE applications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  job_id UUID REFERENCES jobs(id) ON DELETE CASCADE NOT NULL,
-  seeker_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  status VARCHAR NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'under_review', 'shortlisted', 'interview', 'rejected', 'hired')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  resume_url VARCHAR,
-  cover_letter TEXT,
-  UNIQUE(job_id, seeker_id)
-);
+### Prerequisites
 
--- Create policies to control access
-CREATE POLICY "Public profiles are viewable by everyone." 
-  ON profiles FOR SELECT USING (true);
+-   Node.js and npm
+-   Python 3.8+ and pip
+-   Git
+-   [Ollama](https://ollama.com/) for running the Mistral LLM locally.
 
-CREATE POLICY "Users can insert their own profile." 
-  ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+### 1. Clone the Repository
 
-CREATE POLICY "Users can update their own profile." 
-  ON profiles FOR UPDATE USING (auth.uid() = id);
-
--- Seeker profile policies
-CREATE POLICY "Seeker profiles are viewable by everyone." 
-  ON seeker_profiles FOR SELECT USING (true);
-
-CREATE POLICY "Seekers can insert their own profile." 
-  ON seeker_profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Seekers can update their own profile." 
-  ON seeker_profiles FOR UPDATE USING (auth.uid() = id);
-
--- Employer profile policies
-CREATE POLICY "Employer profiles are viewable by everyone." 
-  ON employer_profiles FOR SELECT USING (true);
-
-CREATE POLICY "Employers can insert their own profile." 
-  ON employer_profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Employers can update their own profile." 
-  ON employer_profiles FOR UPDATE USING (auth.uid() = id);
-
--- Job policies
-CREATE POLICY "Jobs are viewable by everyone." 
-  ON jobs FOR SELECT USING (true);
-
-CREATE POLICY "Employers can insert their own jobs." 
-  ON jobs FOR INSERT WITH CHECK (auth.uid() = company_id);
-
-CREATE POLICY "Employers can update their own jobs." 
-  ON jobs FOR UPDATE USING (auth.uid() = company_id);
-
-CREATE POLICY "Employers can delete their own jobs." 
-  ON jobs FOR DELETE USING (auth.uid() = company_id);
-
--- Application policies
-CREATE POLICY "Employers can view applications for their jobs." 
-  ON applications FOR SELECT USING (EXISTS (
-    SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.company_id = auth.uid()
-  ));
-
-CREATE POLICY "Seekers can view their own applications." 
-  ON applications FOR SELECT USING (auth.uid() = seeker_id);
-
-CREATE POLICY "Seekers can insert their own applications." 
-  ON applications FOR INSERT WITH CHECK (auth.uid() = seeker_id);
-
-CREATE POLICY "Seekers can update their own applications." 
-  ON applications FOR UPDATE USING (auth.uid() = seeker_id);
-
-CREATE POLICY "Employers can update applications for their jobs." 
-  ON applications FOR UPDATE USING (EXISTS (
-    SELECT 1 FROM jobs WHERE jobs.id = applications.job_id AND jobs.company_id = auth.uid()
-  ));
+```bash
+git clone <repository-url>
+cd <repository-directory>
 ```
 
-## 4. Set Up Storage for Resumes
+### 2. Backend Setup
 
-1. In the Supabase dashboard, go to Storage:
-   - Create a bucket called `resumes`
-   - Set the bucket's privacy setting to "Private"
+```bash
+# Navigate to the backend directory
+cd backend
 
-2. Create policies for the resumes bucket:
+# Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
-```sql
--- Allow users to upload their own resumes
-CREATE POLICY "Users can upload their own resumes" ON storage.objects
-  FOR INSERT WITH CHECK (
-    (bucket_id = 'resumes') AND 
-    (auth.uid() = SUBSTRING(name FROM 'users/(.+?)/'))
-  );
+# Install dependencies
+pip install -r requirements.txt
 
--- Allow users to read their own resumes
-CREATE POLICY "Users can read their own resumes" ON storage.objects
-  FOR SELECT USING (
-    (bucket_id = 'resumes') AND 
-    (auth.uid() = SUBSTRING(name FROM 'users/(.+?)/'))
-  );
+# Set up Ollama (if not already done)
+# This will download the Mistral model
+ollama pull mistral
 
--- Allow employers to read resumes from job applications
-CREATE POLICY "Employers can read resumes from applications" ON storage.objects
-  FOR SELECT USING (
-    (bucket_id = 'resumes') AND 
-    EXISTS (
-      SELECT 1 FROM jobs j
-      JOIN applications a ON j.id = a.job_id
-      WHERE j.company_id = auth.uid() AND a.resume_url = name
-    )
-  );
+# Create a .env file in the backend directory and add your API key
+touch .env
 ```
 
-3. For handling resume uploads from the frontend:
+Your `backend/.env` file should contain:
 
-```javascript
-// Example of uploading a resume to Supabase Storage
-import { supabase } from './supabase';
-
-const uploadResume = async (file, userId) => {
-  try {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random().toString(36).slice(2)}.${fileExt}`;
-    const filePath = `users/${userId}/${fileName}`;
-
-    const { data, error } = await supabase.storage
-      .from('resumes')
-      .upload(filePath, file);
-
-    if (error) throw error;
-
-    // Get the public URL of the uploaded file
-    const { data: { publicUrl } } = supabase.storage
-      .from('resumes')
-      .getPublicUrl(filePath);
-
-    return { path: filePath, url: publicUrl };
-  } catch (error) {
-    console.error('Error uploading resume:', error);
-    throw error;
-  }
-};
+```env
+GEMINI_API_KEY="YOUR_GOOGLE_AI_API_KEY"
 ```
 
-## 5. Configure Authentication Settings
+### 3. Frontend Setup
 
-1. In the Supabase dashboard, go to Authentication > Settings:
-   - Set the Site URL to your application's URL (e.g., http://localhost:3000)
-   - Configure email templates for signup, invitation, and password reset
-   - Enable the authentication providers you want to use (Email, Google, etc.)
+```bash
+# Navigate to the project root and then the frontend directory
+# (Assuming you are in the backend directory from the previous step)
+cd .. 
 
-## 6. Enable Security Features
+# Install dependencies
+npm install
 
-1. Set up Row Level Security (RLS) for all tables:
-   - Go to Database > Tables
-   - For each table, click the three dots and select "Edit Table"
-   - Enable Row Level Security
-   - Apply the policies defined above
+# Create a .env file in the root directory
+touch .env
+```
 
-## 7. Test Authentication
+Your root `.env` file for the frontend should contain:
 
-1. Run the application and test the following flows:
-   - Sign up as a Seeker
-   - Sign up as an Employer
-   - Sign in with both account types
-   - Password reset
-   - Sign out
+```env
+REACT_APP_SUPABASE_URL="YOUR_SUPABASE_URL"
+REACT_APP_SUPABASE_ANON_KEY="YOUR_SUPABASE_ANON_KEY"
+```
 
-## Additional Resources
+### 4. Running the Application
 
-- [Supabase Auth Documentation](https://supabase.com/docs/guides/auth)
-- [Supabase Storage Documentation](https://supabase.com/docs/guides/storage)
-- [React Auth Hooks](https://supabase.com/docs/guides/auth/auth-helpers/auth-ui) 
+1.  **Start the Backend Server**:
+    ```bash
+    # From the /backend directory
+    uvicorn main:app --reload
+    ```
+    The backend will be running at `http://localhost:8000`.
+
+2.  **Start the Frontend Application**:
+    ```bash
+    # From the root directory
+    npm start
+    ```
+    The frontend will open and run at `http://localhost:3000`.
+
+## 👥 Target Users
+
+-   **Recruiters & HR Teams**: Companies looking to improve hiring efficiency, reduce the burden of high application volumes, and make data-informed hiring decisions.
+-   **Job Seekers**: Candidates who value transparent application processes, personalized job recommendations, and insights into market trends and salary expectations. 
