@@ -15,18 +15,24 @@ const axiosInstance = axios.create({
 // Add a request interceptor to attach the current session token
 axiosInstance.interceptors.request.use(
   async (config) => {
-    // Get the current session
-    const { data } = await supabase.auth.getSession();
-    const session = data?.session;
-    
-    // If we have a session, attach the access token
-    if (session) {
-      config.headers.Authorization = `Bearer ${session.access_token}`;
+    try {
+      // Get the current session
+      const { data } = await supabase.auth.getSession();
+      const session = data?.session;
+
+      // If we have a session, attach the access token
+      if (session) {
+        config.headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
+      return config;
+    } catch (error) {
+      console.error('Request interceptor error:', error);
+      return config;
     }
-    
-    return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
@@ -37,22 +43,42 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Log the error for debugging
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message: error.message
+    });
+
     // Handle 401 errors (unauthorized)
     if (error.response && error.response.status === 401) {
-      // Attempt to refresh the session
-      const { data, error: refreshError } = await supabase.auth.refreshSession();
-      
-      if (!refreshError && data.session) {
-        // Retry the original request with the new token
-        const originalRequest = error.config;
-        originalRequest.headers.Authorization = `Bearer ${data.session.access_token}`;
-        return axiosInstance(originalRequest);
-      } else {
-        // If refresh fails, redirect to login
+      try {
+        // Attempt to refresh the session
+        const { data, error: refreshError } = await supabase.auth.refreshSession();
+
+        if (!refreshError && data.session) {
+          // Retry the original request with the new token
+          const originalRequest = error.config;
+          originalRequest.headers.Authorization = `Bearer ${data.session.access_token}`;
+          return axiosInstance(originalRequest);
+        } else {
+          // If refresh fails, redirect to login
+          window.location.href = "/login/";
+        }
+      } catch (refreshError) {
+        console.error('Session refresh error:', refreshError);
         window.location.href = "/login/";
       }
     }
-    
+
+    // Handle connection errors
+    if (!error.response) {
+      console.error('Network error - Backend might be down');
+      // You might want to show a user-friendly message here
+      return Promise.reject(new Error('Unable to connect to the server. Please check if the backend is running.'));
+    }
+
     // For other errors, just reject the promise
     return Promise.reject(error);
   }

@@ -21,7 +21,7 @@ const ResumeRanking = () => {
 
     const fetchScores = async () => {
         try {
-            const response = await axios.get('/api/resume-scores');
+            const response = await axios.get('http://localhost:8000/api/resume-scores');
             setScores(response.data);
         } catch (error) {
             console.error('Error fetching scores:', error);
@@ -36,7 +36,7 @@ const ResumeRanking = () => {
 
     const recalculateScores = async (newWeights) => {
         try {
-            const response = await axios.post('/api/recalculate-scores', { weights: newWeights });
+            const response = await axios.post('http://localhost:8000/api/recalculate-scores', { weights: newWeights });
             setScores(response.data);
         } catch (error) {
             console.error('Error recalculating scores:', error);

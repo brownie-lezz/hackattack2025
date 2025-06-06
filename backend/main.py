@@ -15,6 +15,15 @@ from pdf2image import convert_from_path
 import pytesseract
 from PIL import Image
 import re
+import uvicorn
+import sys
+import traceback
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import shutil
+import random
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -41,6 +50,18 @@ app.mount("/images", StaticFiles(directory="images"), name="images")
 
 # Local Mistral configuration
 LOCAL_MISTRAL_URL = "http://localhost:11434/api/generate"  # Default Ollama endpoint
+
+# Initialize prediction_service as None
+prediction_service = None
+
+try:
+    from ml_model.salary_service import prediction_service
+except SyntaxError as e:
+    print(f"[WARNING] Could not import prediction_service due to syntax error in careerjet_api_client: {e}")
+    print("[WARNING] Similar jobs functionality will be disabled")
+except Exception as e:
+    print(f"[WARNING] Could not import prediction_service: {e}")
+    print("[WARNING] Similar jobs functionality will be disabled")
 
 def call_local_mistral(prompt: str) -> str:
     """Call local Mistral instance through Ollama."""
@@ -348,6 +369,87 @@ def load_json_data(filename: str) -> dict:
 jobs_data = load_json_data('jobs.json')
 users_data = load_json_data('users.json')
 
+# Database setup for job descriptions
+SQLALCHEMY_DATABASE_URL = "sqlite:///./job_descriptions.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Models
+class JobDescription(Base):
+    __tablename__ = "job_descriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Create tables
+try:
+    # Ensure the database directory exists
+    os.makedirs(os.path.dirname(SQLALCHEMY_DATABASE_URL.replace('sqlite:///', '')), exist_ok=True)
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created successfully")
+except Exception as e:
+    print(f"Error creating database tables: {str(e)}")
+    print(f"Error type: {type(e)}")
+    print(f"Traceback: {traceback.format_exc()}")
+
+# Pydantic models
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    full_name: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    full_name: str
+    created_at: datetime
+
+class ProfileCreate(BaseModel):
+    id: str
+    full_name: str
+    email: str
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    education: Optional[List[dict]] = None
+    experience: Optional[List[dict]] = None
+    skills: Optional[List[str]] = None
+    certifications: Optional[List[str]] = None
+    languages: Optional[List[str]] = None
+    interests: Optional[List[str]] = None
+
+class JobDescriptionCreate(BaseModel):
+    title: str
+    company: str
+    location: str
+    description: str
+    requirements: List[str]
+    salary_range: Optional[str] = None
+    workType: str
+
+class JobDescriptionResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+# Database dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 # Models
 class User(BaseModel):
     id: str
@@ -395,10 +497,35 @@ class QuestionGenerationRequest(BaseModel):
     job_description: str
     required_skills: List[str]
 
+# Market Analysis Models
+class SalaryPredictionRequest(BaseModel):
+    title: str
+    location: str
+    workType: str
+    experienceLevel: str
+    industry: str
+    skills: List[str]
+    education: str
+    certification: str
+    experience: str
+    remote: bool
+    companySize: int
+    as_monthly: bool
+
+class SimilarJobsRequest(BaseModel):
+    title: str
+    location: str
+    keywords: str
+    workType: str
+
+class ChatRequest(BaseModel):
+    message: str
+    resumes: List[dict]
+
 # Routes
 @app.get("/")
 async def read_root():
-    return {"message": "Welcome to TalentVerse API"}
+    return {"message": "Welcome to the API"}
 
 @app.get("/jobs")
 async def get_jobs():
@@ -435,151 +562,123 @@ async def get_job_descriptions():
                         job_desc = {
                             "id": filename.replace('.txt', ''),
                             "title": filename.replace('.txt', '').replace('_', ' '),
-                            "description": content,
-                            "requirements": []  # You might want to parse requirements from the content
+                            "content": content
                         }
                         job_descriptions.append(job_desc)
         
         return job_descriptions
     except Exception as e:
+        print(f"Error in get_job_descriptions: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/job-descriptions")
+async def create_job_description(job: JobDescriptionCreate):
+    try:
+        job_desc_dir = "Job_Description"
+        os.makedirs(job_desc_dir, exist_ok=True)
+        
+        # Create a filename from the title
+        filename = job.title.replace(' ', '_') + '.txt'
+        filepath = os.path.join(job_desc_dir, filename)
+        
+        # Write the content to the file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(job.content)
+        
+        return {
+            "id": filename.replace('.txt', ''),
+            "title": job.title,
+            "content": job.content
+        }
+    except Exception as e:
+        print(f"Error in create_job_description: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/job-descriptions/{job_id}")
+async def delete_job_description(job_id: str):
+    try:
+        job_desc_dir = "Job_Description"
+        filename = job_id + '.txt'
+        filepath = os.path.join(job_desc_dir, filename)
+        
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            return {"message": "Job description deleted successfully"}
+        else:
+            raise HTTPException(status_code=404, detail="Job description not found")
+    except Exception as e:
+        print(f"Error in delete_job_description: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/resumes")
-async def get_resumes(path: str = Query(None), subdir: str = Query(None)):
+async def get_resumes(path: str = "original", subdir: str = None):
     try:
-        # Determine which directory to use
-        base_dir = "parsed_resumes" if path == "parsed" else "Original_Resumes"
+        print(f"Getting resumes from path: {path}, subdir: {subdir}")
         
-        if not os.path.exists(base_dir):
-            os.makedirs(base_dir, exist_ok=True)
-            return []
+        # Determine the base directory
+        if path == "original":
+            base_dir = "Original_Resumes"
+        elif path == "parsed":
+            base_dir = "Parsed_Resumes"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid path parameter")
         
-        # If subdir is specified, use it as the target directory
+        # If subdir is provided, use it as the full path
         if subdir:
-            # Clean the subdir path to prevent directory traversal
-            subdir = os.path.normpath(subdir).lstrip(os.sep)
-            target_dir = os.path.join(base_dir, subdir)
+            full_path = os.path.join(base_dir, subdir)
+        else:
+            full_path = base_dir
             
-            # If it's a file, return its content
-            if os.path.isfile(target_dir):
-                try:
-                    if target_dir.lower().endswith('.pdf'):
-                        content = extract_text_from_pdf(target_dir)
-                    else:
-                        with open(target_dir, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                    return {"content": content}
-                except Exception as e:
-                    print(f"Error reading file {target_dir}: {str(e)}")
-                    raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
-            
-            # If it's a directory, scan it
-            if os.path.isdir(target_dir):
-                items = []
-                for item in os.listdir(target_dir):
-                    item_path = os.path.join(target_dir, item)
-                    relative_path = os.path.relpath(item_path, base_dir)
-                    
-                    if os.path.isdir(item_path):
-                        items.append({
-                            "id": relative_path,
-                            "name": item,
-                            "type": "directory",
-                            "path": relative_path,
-                            "uploadDate": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat(),
-                            "items": scan_directory(item_path)
-                        })
-                    elif item.lower().endswith(('.pdf', '.doc', '.docx', '.txt')):
-                        try:
-                            file_stats = os.stat(item_path)
-                            items.append({
-                                "id": relative_path,
-                                "name": item,
-                                "type": "file",
-                                "path": relative_path,
-                                "uploadDate": datetime.fromtimestamp(file_stats.st_mtime).isoformat()
-                            })
-                        except Exception as e:
-                            print(f"Error processing file {item_path}: {str(e)}")
-                            continue
-                
-                # Sort items: directories first, then files by modification time
-                directories = [item for item in items if item["type"] == "directory"]
-                files = [item for item in items if item["type"] == "file"]
-                files.sort(key=lambda x: x["uploadDate"], reverse=True)
-                
-                return directories + files
-            
-            # If neither file nor directory exists, return empty list
+        print(f"Full path: {full_path}")
+        
+        if not os.path.exists(full_path):
+            print(f"Path does not exist: {full_path}")
+            if path == "parsed" and subdir:
+                # For parsed files, return empty content if file doesn't exist
+                return {"content": "", "type": "text"}
             return []
         
-        # If no subdir specified, scan the base directory
-        return scan_directory(base_dir)
-        
-    except Exception as e:
-        print(f"Error in get_resumes: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        if os.path.isfile(full_path):
+            # If it's a file, return its content
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                return {"content": content, "type": "text"}
+            except Exception as e:
+                print(f"Error reading file {full_path}: {str(e)}")
+                return {"content": "", "type": "text"}
 
-def scan_directory(directory):
-    """Helper function to scan a directory and return its contents."""
-    items = []
-    try:
-        for item in os.listdir(directory):
-            item_path = os.path.join(directory, item)
-            relative_path = os.path.relpath(item_path, "Original_Resumes")
+        # If it's a directory, list its contents
+        items = []
+        for item in os.listdir(full_path):
+            item_path = os.path.join(full_path, item)
+            is_dir = os.path.isdir(item_path)
             
-            if os.path.isdir(item_path):
-                items.append({
-                    "id": relative_path,
-                    "name": item,
-                    "type": "directory",
-                    "path": relative_path,
-                    "uploadDate": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat(),
-                    "items": scan_directory(item_path)
-                })
-            elif item.lower().endswith(('.pdf', '.doc', '.docx', '.txt')):
-                try:
-                    file_stats = os.stat(item_path)
-                    items.append({
-                        "id": relative_path,
-                        "name": item,
-                        "type": "file",
-                        "path": relative_path,
-                        "uploadDate": datetime.fromtimestamp(file_stats.st_mtime).isoformat()
-                    })
-                except Exception as e:
-                    print(f"Error processing file {item_path}: {str(e)}")
-                    continue
+            items.append({
+                "name": item,
+                "type": "directory" if is_dir else "file",
+                "path": item_path
+            })
+            
+        print(f"Found {len(items)} items")
+        return items
     except Exception as e:
-        print(f"Error scanning directory {directory}: {str(e)}")
-        return []
-    
-    # Sort items: directories first, then files by modification time
-    directories = [item for item in items if item["type"] == "directory"]
-    files = [item for item in items if item["type"] == "file"]
-    files.sort(key=lambda x: x["uploadDate"], reverse=True)
-    
-    return directories + files
-
-@app.post("/upload-resume")
-async def upload_resume(file: UploadFile = File(...)):
-    try:
-        # Create parsed_resumes directory if it doesn't exist
-        os.makedirs("parsed_resumes", exist_ok=True)
-        
-        # Save the uploaded file
-        file_path = f"parsed_resumes/{file.filename}"
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        return {"message": "Resume uploaded successfully", "filename": file.filename}
-    except Exception as e:
+        print(f"Error getting resumes: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check endpoint for monitoring backend status."""
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0"
+        }
+    )
 
 def clean_parsed_resumes_folder():
     """Clean the parsed_resumes folder by removing all analysis files."""
@@ -714,33 +813,55 @@ async def analyze_resumes(request: ResumeAnalysisRequest):
         print(f"Error in analyze_resumes: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/mistral/chat")
-async def chat_with_mistral(message: ChatMessage):
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
     try:
+        print(f"Received chat request with message: {request.message}")
+        print(f"Number of resumes: {len(request.resumes)}")
+        
+        # Get parsed resumes
+        parsed_resumes = []
+        for resume in request.resumes:
+            if resume and resume.get('name'):
+                # Convert original filename to parsed filename
+                parsed_filename = f"pypdf2_{resume['name'].replace('.pdf', '.txt')}"
+                parsed_path = os.path.join("Parsed_Resumes", parsed_filename)
+                
+                if os.path.exists(parsed_path):
+                    try:
+                        with open(parsed_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            parsed_resumes.append({
+                                "name": resume['name'],
+                                "content": content
+                            })
+                    except Exception as e:
+                        print(f"Error reading parsed resume {parsed_path}: {str(e)}")
+                        continue
+        
+        if not parsed_resumes:
+            return {"response": "I couldn't find any parsed resume content to analyze. Please make sure the resumes have been processed."}
+        
         # Prepare the prompt for Mistral
-        prompt = f"""You are a resume assistant. I will provide you with:
-1. Multiple resume contents (each marked with its name)
-2. The analysis results
-3. A question from the user
-
-Please use all the resume contents and analysis results to provide a comprehensive answer. When comparing or analyzing multiple resumes, make sure to reference which resume you're talking about by its name.
+        prompt = f"""Based on the following resume contents, please answer this question: {request.message}
 
 Resume Contents:
-{message.resume_text}
-
-Analysis Results:
-{json.dumps(message.analysis, indent=2) if message.analysis else "No analysis results available"}
-
-User Question: {message.question}
-
-Please provide a clear and concise response focusing on the specific question asked. Use all the resume contents and analysis results to give a thorough answer. When comparing resumes or discussing specific details, always specify which resume you're referring to."""
+"""
+        for resume in parsed_resumes:
+            prompt += f"\n=== Resume: {resume['name']} ===\n{resume['content']}\n"
 
         # Call local Mistral
-        response = call_local_mistral(prompt)
-        
-        return {"response": response}
+        try:
+            response = call_local_mistral(prompt)
+            return {"response": response}
+        except Exception as e:
+            print(f"Error calling local Mistral: {str(e)}")
+            return {"response": "I apologize, but I encountered an error while processing your request. Please try again."}
+            
     except Exception as e:
-        print(f"Error in chat with Mistral: {str(e)}")
+        print(f"Error in chat endpoint: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/generate-questions")
@@ -850,17 +971,362 @@ async def handle_options(path: str):
 async def test_endpoint():
     return {"message": "Test endpoint working"}
 
+@app.post("/api/jobs/salary-prediction")
+async def predict_salary(request: SalaryPredictionRequest):
+    try:
+        # Prepare the prompt for Mistral
+        prompt = f"""Analyze this job posting and predict a reasonable salary range.
+        Job Title: {request.title}
+        Location: {request.location}
+        Work Type: {request.workType}
+        Experience Level: {request.experienceLevel}
+        Industry: {request.industry}
+        Required Skills: {', '.join(request.skills)}
+        Education: {request.education}
+        Certification: {request.certification}
+        Experience Required: {request.experience}
+        Remote: {request.remote}
+        Company Size: {request.companySize}
+
+        Please provide a salary prediction in the following JSON format:
+        {{
+            "success": true,
+            "monthly": "<formatted monthly salary range>",
+            "salaryValue": <numeric value in thousands>,
+            "confidence": <confidence score 0-100>,
+            "factors": [
+                "<factor affecting salary>",
+                ...
+            ]
+        }}"""
+
+        # Call local Mistral
+        response = call_local_mistral(prompt)
+        
+        # Parse the response
+        try:
+            result = json.loads(response)
+            return result
+        except json.JSONDecodeError:
+            # Fallback to default values if parsing fails
+            return {
+                "success": True,
+                "monthly": "$6,000 - $8,000",
+                "salaryValue": 7,
+                "confidence": 70,
+                "factors": [
+                    "Market average for similar positions",
+                    "Required skills and experience",
+                    "Location and remote work options"
+                ]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/jobs/similar-jobs")
+async def get_similar_jobs(request: SimilarJobsRequest):
+    if prediction_service is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Similar jobs service is currently unavailable. Please try again later."
+        )
+    
+    try:
+        job_data = {
+            "title": request.title,
+            "location": request.location,
+            "keywords": request.keywords,
+            "workType": request.workType
+        }
+        similar_jobs = prediction_service.get_similar_jobs(job_data)
+        return similar_jobs
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    try:
+        print(f"Received file upload request: {file.filename}")
+        
+        # Create the upload directory if it doesn't exist
+        upload_dir = "Original_Resumes"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Clean the filename
+        filename = file.filename.replace(' ', '_')
+        file_path = os.path.join(upload_dir, filename)
+        
+        print(f"Saving file to: {file_path}")
+        
+        # Save the file
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        print(f"File saved successfully: {file_path}")
+        return {"message": "File uploaded successfully", "filename": filename}
+    except Exception as e:
+        print(f"Error uploading file: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/resumes/folders")
+async def create_folder(request: dict):
+    try:
+        folder_name = request.get("name")
+        parent_id = request.get("parentId", "")
+        
+        if not folder_name:
+            raise HTTPException(status_code=400, detail="Folder name is required")
+        
+        # Create the base directory if it doesn't exist
+        base_dir = "Original_Resumes"
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Create the full path
+        if parent_id:
+            folder_path = os.path.join(base_dir, parent_id, folder_name)
+        else:
+            folder_path = os.path.join(base_dir, folder_name)
+        
+        # Create the folder
+        os.makedirs(folder_path, exist_ok=True)
+        
+        return {"message": "Folder created successfully", "path": folder_path}
+    except Exception as e:
+        print(f"Error creating folder: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/resumes/{resume_id}")
+async def delete_resume(resume_id: str):
+    try:
+        # Construct the full path
+        file_path = os.path.join("Original_Resumes", resume_id)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File or directory not found")
+        
+        # Delete the file or directory
+        if os.path.isdir(file_path):
+            shutil.rmtree(file_path)
+        else:
+            os.remove(file_path)
+        
+        return {"message": "Item deleted successfully"}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error deleting item: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/resumes/{resume_id}/download")
+async def download_resume(resume_id: str):
+    try:
+        # Construct the full path
+        file_path = os.path.join("Original_Resumes", resume_id)
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        if os.path.isdir(file_path):
+            raise HTTPException(status_code=400, detail="Cannot download a directory")
+        
+        # Return the file
+        return FileResponse(
+            file_path,
+            media_type="application/octet-stream",
+            filename=os.path.basename(file_path)
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error downloading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/profiles")
+async def create_profile(profile: ProfileCreate):
+    try:
+        # First check if user exists
+        user_query = "SELECT id FROM users WHERE id = $1"
+        user = await database.fetch_one(user_query, profile.id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if profile already exists
+        existing_profile = await database.fetch_one(
+            "SELECT * FROM profiles WHERE id = $1",
+            profile.id
+        )
+
+        if existing_profile:
+            # Update existing profile
+            query = """
+                UPDATE profiles 
+                SET full_name = $1, 
+                    email = $2, 
+                    phone = $3, 
+                    address = $4, 
+                    education = $5, 
+                    experience = $6, 
+                    skills = $7, 
+                    certifications = $8, 
+                    languages = $9, 
+                    interests = $10, 
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $11
+                RETURNING *
+            """
+            values = (
+                profile.full_name,
+                profile.email,
+                profile.phone,
+                profile.address,
+                profile.education,
+                profile.experience,
+                profile.skills,
+                profile.certifications,
+                profile.languages,
+                profile.interests,
+                profile.id
+            )
+        else:
+            # Create new profile
+            query = """
+                INSERT INTO profiles (
+                    id, full_name, email, phone, address, 
+                    education, experience, skills, certifications, 
+                    languages, interests, created_at, updated_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )
+                RETURNING *
+            """
+            values = (
+                profile.id,
+                profile.full_name,
+                profile.email,
+                profile.phone,
+                profile.address,
+                profile.education,
+                profile.experience,
+                profile.skills,
+                profile.certifications,
+                profile.languages,
+                profile.interests
+            )
+
+        result = await database.fetch_one(query, *values)
+        return dict(result)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        print(f"Error in create_profile: {str(e)}")
+        print(f"Error type: {type(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add this function before the ML module imports
+async def create_mock_jobs():
+    try:
+        # Mock job data
+        mock_jobs = [
+            {
+                "title": "Senior Software Engineer",
+                "description": "We are looking for a Senior Software Engineer to join our team. The ideal candidate will have experience in full-stack development and a passion for creating scalable applications.",
+                "required_skills": ["Python", "JavaScript", "React", "Node.js", "AWS"],
+                "company_name": "Tech Innovators Inc",
+                "location": "San Francisco, CA",
+                "salary_range": "$120,000 - $180,000",
+                "job_type": "Full-time",
+                "created_at": datetime.now()
+            },
+            {
+                "title": "Data Scientist",
+                "description": "Join our data science team to work on cutting-edge machine learning projects. You'll be responsible for developing and implementing ML models to solve complex business problems.",
+                "required_skills": ["Python", "Machine Learning", "TensorFlow", "SQL", "Data Analysis"],
+                "company_name": "Data Dynamics",
+                "location": "New York, NY",
+                "salary_range": "$100,000 - $150,000",
+                "job_type": "Full-time",
+                "created_at": datetime.now()
+            },
+            {
+                "title": "Frontend Developer",
+                "description": "We're seeking a Frontend Developer to create beautiful and responsive user interfaces. Experience with modern JavaScript frameworks is required.",
+                "required_skills": ["JavaScript", "React", "HTML", "CSS", "TypeScript"],
+                "company_name": "Web Solutions Ltd",
+                "location": "Remote",
+                "salary_range": "$80,000 - $120,000",
+                "job_type": "Full-time",
+                "created_at": datetime.now()
+            },
+            {
+                "title": "DevOps Engineer",
+                "description": "Looking for a DevOps Engineer to help us build and maintain our cloud infrastructure. Experience with containerization and CI/CD is essential.",
+                "required_skills": ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux"],
+                "company_name": "Cloud Systems",
+                "location": "Seattle, WA",
+                "salary_range": "$110,000 - $160,000",
+                "job_type": "Full-time",
+                "created_at": datetime.now()
+            },
+            {
+                "title": "Product Manager",
+                "description": "Join our product team to drive the development of innovative software solutions. You'll work closely with engineering and design teams to deliver great products.",
+                "required_skills": ["Product Management", "Agile", "User Research", "Data Analysis", "Communication"],
+                "company_name": "Product Pro",
+                "location": "Austin, TX",
+                "salary_range": "$90,000 - $140,000",
+                "job_type": "Full-time",
+                "created_at": datetime.now()
+            }
+        ]
+
+        # Insert mock jobs
+        for job in mock_jobs:
+            query = """
+                INSERT INTO jobs (
+                    title, description, required_skills, company_name,
+                    location, salary_range, job_type, created_at
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8
+                )
+            """
+            values = (
+                job["title"],
+                job["description"],
+                job["required_skills"],
+                job["company_name"],
+                job["location"],
+                job["salary_range"],
+                job["job_type"],
+                job["created_at"]
+            )
+            await database.execute(query, *values)
+
+        return {"message": "Mock jobs created successfully"}
+    except Exception as e:
+        print(f"Error creating mock jobs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Add this route
+@app.post("/api/create-mock-jobs")
+async def create_mock_jobs_endpoint():
+    return await create_mock_jobs()
+
 try:
     # Try to import ML modules
-    from job_routes import job_routes
-    from salary_prediction_service import salary_prediction_bp
+    from job_routes import router as job_router
+    from salary_prediction_service import router as salary_router
     # Attempt to import prediction_service. If this fails, 
     # routes relying on it will fail at runtime or blueprint registration might be affected.
     from ml_model.salary_service import prediction_service 
     
-    # Register route blueprints
-    app.register_blueprint(job_routes)
-    app.register_blueprint(salary_prediction_bp)
+    # Include the routers
+    app.include_router(job_router)
+    app.include_router(salary_router)
     # If we reach here, critical imports and blueprint registrations were successful.
 except ImportError as e:
     # Critical modules failed to import. The application might be in a non-operational state.

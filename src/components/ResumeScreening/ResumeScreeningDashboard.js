@@ -229,20 +229,30 @@ const ResumeScreeningDashboard = () => {
         } else {
             console.log('Adding resume:', resume.name);
             try {
-                // Load the resume content from the parsed_resumes directory
-                const response = await fetch(`/api/resumes?path=parsed&subdir=${resume.path}`);
+                // Load the resume content from the original resumes directory
+                const response = await fetch(`http://localhost:8000/api/resumes?path=original&subdir=${encodeURIComponent(resume.path)}`);
                 if (!response.ok) {
                     throw new Error('Failed to load resume content');
                 }
                 const data = await response.json();
-                const resumeContent = data.content || '';
 
-                // Add the new resume to the selection with its content
-                const newSelection = [...selectedResumes, {
+                // Create the new resume object with content
+                const newResume = {
                     ...resume,
-                    content: resumeContent
-                }];
-                setSelectedResumes(newSelection);
+                    content: data.content || '',
+                    type: data.type || 'text'
+                };
+
+                // Add to selected resumes
+                setSelectedResumes(prev => [...prev, newResume]);
+
+                // Log the selection
+                console.log('Added resume to selection:', {
+                    id: newResume.id,
+                    name: newResume.name,
+                    hasContent: !!newResume.content,
+                    contentLength: newResume.content?.length || 0
+                });
             } catch (error) {
                 console.error('Error loading resume content:', error);
                 setError('Failed to load resume content: ' + error.message);
@@ -296,7 +306,7 @@ const ResumeScreeningDashboard = () => {
             });
 
             // Make API call to analyze resumes
-            const response = await axios.post('/api/analyze-resumes', analysisData);
+            const response = await axios.post('http://localhost:8000/api/analyze-resumes', analysisData);
             console.log('Received analysis response from backend:', response.data);
 
             if (response.data && Array.isArray(response.data)) {

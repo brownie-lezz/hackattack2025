@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Container, Typography, Box, Paper, Chip, Button, CircularProgress, Alert, Grid, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
-import { BusinessCenter, LocationOn, MonetizationOn, Schedule, Description, Checklist, School, Category, WorkHistory, Person } from '@mui/icons-material';
+import { BusinessCenter, LocationOn, MonetizationOn, Schedule, Description, Checklist, School, Category, WorkHistory, Person, Send } from '@mui/icons-material';
 import AuthContext from "../../../context/AuthContext";
 import { getJob } from "../../../utils/jobService";
 
@@ -15,16 +15,19 @@ const JobDetail = () => {
 
   useEffect(() => {
     if (!id) {
+      console.log("Job ID is missing.");
       setError("Job ID is missing.");
       setLoading(false);
       return;
     }
 
     const fetchJob = async () => {
+      console.log("Fetching job with ID:", id);
       setLoading(true);
       setError(null);
       try {
         const response = await getJob(id);
+        console.log("Response from getJob:", response);
         if (response.success && response.job) {
           console.log("Fetched job:", response.job);
           setJob(response.job);
@@ -44,6 +47,18 @@ const JobDetail = () => {
 
     fetchJob();
   }, [id]);
+
+  const handleApply = () => {
+    // Navigate to AI examination with job details
+    navigate(`/ai-examination/${id}`, {
+      state: {
+        jobTitle: job.title,
+        companyName: job.company_name,
+        jobDescription: job.description,
+        requiredSkills: job.required_skills
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -126,7 +141,7 @@ const JobDetail = () => {
           )}
         </Grid>
 
-        <Box sx={{ mb: 3 }}>
+        <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Job Description</Typography>
           <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-wrap' }}>
             {job.description || "No description provided."}
@@ -135,7 +150,7 @@ const JobDetail = () => {
 
         {job.skills && job.skills.length > 0 && (
           <Box sx={{ mb: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Skills</Typography>
+            <Typography variant="h6" gutterBottom sx={{ fontWeight: 'medium' }}>Required Skills</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {job.skills.map((skill, index) => (
                 <Chip key={index} label={skill} color="primary" variant="outlined" />
@@ -158,14 +173,21 @@ const JobDetail = () => {
           </Box>
         )}
 
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
+        <Box sx={{ mt: 4, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
           {user && user.is_seeker && (
             <Button
               variant="contained"
               color="primary"
-              component={Link}
-              to={`/jobs/${id}/apply`}
               size="large"
+              startIcon={<Send />}
+              onClick={handleApply}
+              sx={{
+                borderRadius: 2,
+                textTransform: 'none',
+                px: 4,
+                py: 1.5,
+                fontSize: '1.1rem'
+              }}
             >
               Apply Now
             </Button>
@@ -173,7 +195,13 @@ const JobDetail = () => {
           <Button
             variant="outlined"
             onClick={() => navigate(-1)}
-            sx={{ ml: user && user.is_seeker ? 2 : 0 }}
+            sx={{
+              borderRadius: 2,
+              textTransform: 'none',
+              px: 4,
+              py: 1.5,
+              fontSize: '1.1rem'
+            }}
           >
             Back
           </Button>

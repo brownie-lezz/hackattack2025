@@ -22,8 +22,7 @@ import "./Navbar.css";
 const pages = [
   { title: 'Home', path: '/' },
   { title: 'About', path: '/about' },
-  { title: 'Contact', path: '/contact' },
-  { title: 'Resume Screening', path: '/resume-screening' },
+  { title: 'Contact', path: '/contact' }
 ];
 
 const settings = ['Profile', 'Account', 'Dashboard', 'Logout'];

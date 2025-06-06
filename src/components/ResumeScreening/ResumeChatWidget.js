@@ -7,7 +7,7 @@ import CloseIcon from '@mui/icons-material/Close';
 const ResumeChatWidget = ({ selectedResumes, analysisResults }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([]);
-    const [inputValue, setInputValue] = useState('');
+    const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const messagesEndRef = useRef(null);
@@ -22,91 +22,112 @@ const ResumeChatWidget = ({ selectedResumes, analysisResults }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!inputValue.trim()) return;
+        if (!input.trim()) return;
 
         try {
-            // Get all parsed resume content
-            const response = await fetch('/api/resumes?path=parsed');
-            if (!response.ok) {
-                throw new Error('Failed to fetch resume content');
+            setIsLoading(true);
+            setError(null);
+
+            // Get the list of resumes from the original directory
+            const resumesResponse = await fetch('http://localhost:8000/api/resumes?path=original');
+            if (!resumesResponse.ok) {
+                throw new Error('Failed to fetch resumes');
             }
+            const resumes = await resumesResponse.json();
 
-            const files = await response.json();
-            // Find all pypdf2_ files
-            const parsedFiles = files.filter(file =>
-                file.name.startsWith('pypdf2_') && file.name.endsWith('.txt')
-            );
+            // Prepare the message
+            const userMessage = {
+                type: 'user',
+                content: input,
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, userMessage]);
+            setInput('');
 
-            if (parsedFiles.length === 0) {
-                throw new Error('No parsed resume content found');
-            }
+            // Get the content of each resume
+            const resumeContents = await Promise.all(
+                resumes.map(async (resume) => {
+                    if (resume.type === 'file' && resume.name.toLowerCase().endsWith('.pdf')) {
+                        try {
+                            // Convert original filename to parsed filename
+                            const parsedFilename = `pypdf2_${resume.name.replace('.pdf', '.txt')}`;
+                            console.log(`Looking for parsed file: ${parsedFilename}`);
 
-            // Get content from all parsed resumes
-            const allResumeContent = await Promise.all(
-                parsedFiles.map(async (file) => {
-                    const contentResponse = await fetch(`/api/resumes?path=parsed&subdir=${file.name}`);
-                    if (!contentResponse.ok) {
-                        console.error(`Failed to fetch content for resume: ${file.name}`);
-                        return null;
+                            const parsedResponse = await fetch(`http://localhost:8000/api/resumes?path=parsed&subdir=${encodeURIComponent(parsedFilename)}`);
+                            const parsedData = await parsedResponse.json();
+
+                            if (parsedData.content) {
+                                console.log(`Found parsed content for ${resume.name}`);
+                                return {
+                                    name: resume.name,
+                                    content: parsedData.content,
+                                    type: 'parsed'
+                                };
+                            } else {
+                                console.warn(`No parsed content found for ${resume.name}`);
+                                return null;
+                            }
+                        } catch (error) {
+                            console.warn(`Error fetching parsed content for ${resume.name}:`, error);
+                            return null;
+                        }
                     }
-                    const data = await contentResponse.json();
-                    return data.content ? {
-                        name: file.name.replace('pypdf2_', '').replace('.txt', ''),
-                        content: data.content
-                    } : null;
+                    return null;
                 })
             );
 
-            // Filter out any failed fetches
-            const validResumes = allResumeContent.filter(resume => resume !== null);
+            // Filter out null values and empty contents
+            const validResumes = resumeContents.filter(resume => resume && resume.content);
 
             if (validResumes.length === 0) {
-                throw new Error('No valid resume content found');
+                throw new Error('No parsed resume content found. Please make sure the resumes have been processed.');
             }
 
-            // Add user message to chat
-            const userMessage = { role: 'user', content: inputValue };
-            setMessages(prev => [...prev, userMessage]);
-            setInputValue('');
-            setError(null);
+            // Prepare the request to the chatbot
+            const requestData = {
+                message: input,
+                resumes: validResumes
+            };
 
-            // Show loading state
-            setIsLoading(true);
+            console.log('Sending chat request with data:', {
+                messageLength: input.length,
+                resumeCount: validResumes.length,
+                resumeNames: validResumes.map(r => r.name)
+            });
 
-            // Combine all resume content
-            const combinedResumeContent = validResumes.map(resume =>
-                `=== Resume: ${resume.name} ===\n${resume.content}\n\n`
-            ).join('');
-
-            // Send to API
-            const chatResponse = await fetch('/api/mistral/chat', {
+            // Send the message to the chatbot
+            const response = await fetch('http://localhost:8000/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    resume_text: combinedResumeContent,
-                    question: inputValue,
-                    analysis: analysisResults // Use the latest analysis results if available
-                }),
+                body: JSON.stringify(requestData)
             });
 
-            if (!chatResponse.ok) {
-                throw new Error('Failed to get response from AI');
+            if (!response.ok) {
+                throw new Error('Failed to get response from chatbot');
             }
 
-            const chatData = await chatResponse.json();
+            const data = await response.json();
 
-            // Add AI response to chat
-            setMessages(prev => [...prev, { role: 'assistant', content: chatData.response }]);
+            // Add the bot's response to the messages
+            const botMessage = {
+                type: 'bot',
+                content: data.response,
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, botMessage]);
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error in chat:', error);
             setError(error.message || 'An error occurred while processing your request');
+
             // Add error message to chat
-            setMessages(prev => [...prev, {
-                role: 'assistant',
-                content: `I apologize, but I encountered an error: ${error.message}. Please try again.`
-            }]);
+            const errorMessage = {
+                type: 'error',
+                content: 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date().toISOString()
+            };
+            setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
         }
@@ -178,7 +199,7 @@ const ResumeChatWidget = ({ selectedResumes, analysisResults }) => {
                             <Box
                                 key={index}
                                 sx={{
-                                    alignSelf: message.role === 'user' ? 'flex-end' : 'flex-start',
+                                    alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start',
                                     maxWidth: '80%',
                                 }}
                             >
@@ -186,8 +207,8 @@ const ResumeChatWidget = ({ selectedResumes, analysisResults }) => {
                                     elevation={1}
                                     sx={{
                                         p: 1.5,
-                                        backgroundColor: message.role === 'user' ? 'primary.light' : 'grey.100',
-                                        color: message.role === 'user' ? 'white' : 'text.primary',
+                                        backgroundColor: message.type === 'user' ? 'primary.light' : 'grey.100',
+                                        color: message.type === 'user' ? 'white' : 'text.primary',
                                     }}
                                 >
                                     <Typography variant="body1">{message.content}</Typography>
@@ -218,14 +239,14 @@ const ResumeChatWidget = ({ selectedResumes, analysisResults }) => {
                                 fullWidth
                                 size="small"
                                 placeholder="Ask about the last analyzed resume..."
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
                                 disabled={isLoading}
                             />
                             <IconButton
                                 type="submit"
                                 color="primary"
-                                disabled={isLoading || !inputValue.trim()}
+                                disabled={isLoading || !input.trim()}
                             >
                                 <SendIcon />
                             </IconButton>

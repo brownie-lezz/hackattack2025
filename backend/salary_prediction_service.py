@@ -4,6 +4,9 @@ import traceback
 import json
 import os
 import sys
+from fastapi import APIRouter, HTTPException
+from typing import List, Optional
+from pydantic import BaseModel
 
 # Initialize prediction_service to None
 prediction_service = None
@@ -22,6 +25,16 @@ except ImportError as e: # Catching the specific error is good practice
 # Create Blueprint for salary prediction routes
 salary_prediction_bp = Blueprint('salary_prediction', __name__)
 
+# Create the router
+router = APIRouter(prefix="/api/salary", tags=["salary"])
+
+class SalaryPredictionRequest(BaseModel):
+    job_title: str
+    location: str
+    experience_years: Optional[int] = None
+    education_level: Optional[str] = None
+    skills: Optional[List[str]] = None
+
 # Test endpoint
 @salary_prediction_bp.route('/api/test', methods=['GET', 'OPTIONS'])
 def test_endpoint():
@@ -30,62 +43,22 @@ def test_endpoint():
         return jsonify({})  # Return empty response for OPTIONS
     return jsonify({'status': 'success', 'message': 'Test endpoint working'})
 
-@salary_prediction_bp.route('/api/jobs/salary-prediction', methods=['POST', 'OPTIONS'])
-def predict_salary():
-    """
-    Endpoint for salary prediction using local ML model
-    """
-    # Handle OPTIONS requests
-    if request.method == 'OPTIONS':
-        return jsonify({})  # Return empty response for OPTIONS
-        
-    # Check if the prediction service was loaded
-    if prediction_service is None:
-        print("[ERROR] salary_prediction_service.py: prediction_service is None. ML service failed to load.", file=sys.stderr)
-        return jsonify({
-            "success": False,
-            "error": "Machine Learning service is unavailable due to an import failure."
-        }), 503 # Service Unavailable
-
+@router.post("/predict")
+async def predict_salary(request: SalaryPredictionRequest):
     try:
-        # Get data from the request
-        data = request.json
-        
-        # Format the request data for the ML service
-        ml_request_data = {
-            "title": data.get('title', ''),
-            "location": data.get('location', 'Remote'),
-            "formatted_work_type": data.get('workType', 'Full-time'),
-            "formatted_experience_level": data.get('experienceLevel', 'Entry level'),
-            "company_industries": data.get('industry', 'Technology'),
-            "skill_requirement": ', '.join(data.get('skills', [])) if isinstance(data.get('skills', []), list) else data.get('skills', ''),
-            "education_requirement": data.get('education', ''),
-            "certification_requirement": data.get('certification', ''),
-            "experience_requirement": data.get('experience', ''),
-            "remote_allowed": data.get('remote', False),
-            "company_employee_count": data.get('companySize', 500)
+        # Here you would typically call your ML model
+        # For now, return a mock response
+        return {
+            "success": True,
+            "predicted_salary": {
+                "min": 50000,
+                "max": 80000,
+                "median": 65000,
+                "currency": "USD"
+            }
         }
-        
-        # Use the local prediction service
-        # The prediction_service.predict method itself handles initialization 
-        # and returns a dict with {success: False, error: ...} on failure.
-        result = prediction_service.predict(ml_request_data)
-        
-        if not result.get("success", False):
-             # If the service indicates an error, return a 500 status code
-             return jsonify(result), 500
-                
-        return jsonify(result)
-            
     except Exception as e:
-        # Catch any other unexpected errors during request processing or service call
-        print(f"[DEBUG] Exception in /api/jobs/salary-prediction route: {e}", file=sys.stderr)
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 @salary_prediction_bp.route('/api/jobs/similar-jobs', methods=['POST', 'OPTIONS'])
 def get_similar_jobs():

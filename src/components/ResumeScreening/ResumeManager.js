@@ -20,6 +20,7 @@ import {
     LinearProgress,
     Checkbox,
     Divider,
+    ListItemButton,
 } from '@mui/material';
 import {
     Delete as DeleteIcon,
@@ -32,6 +33,7 @@ import {
     Analytics as AnalyticsIcon,
     CreateNewFolder as CreateFolderIcon,
     Visibility as VisibilityIcon,
+    ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -51,9 +53,14 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
         try {
             setLoading(true);
             setError(null);
-            const response = await axios.get('/api/resumes', {
+            console.log('Fetching resumes with params:', {
+                path: currentFolder ? 'original' : null,
+                subdir: currentFolder || null
+            });
+
+            const response = await axios.get('http://localhost:8000/api/resumes', {
                 params: {
-                    path: currentFolder ? 'original' : null,
+                    path: 'original',  // Always fetch from original resumes
                     subdir: currentFolder || null
                 }
             });
@@ -96,12 +103,20 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
     const handleFileSelect = (event) => {
         const file = event.target.files[0];
         if (file) {
+            console.log('Selected file:', {
+                name: file.name,
+                type: file.type,
+                size: file.size
+            });
             setSelectedFile(file);
         }
     };
 
     const handleUpload = async () => {
-        if (!selectedFile) return;
+        if (!selectedFile) {
+            setError('Please select a file first');
+            return;
+        }
 
         try {
             setUploading(true);
@@ -109,7 +124,13 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
             const formData = new FormData();
             formData.append('file', selectedFile);
 
-            await axios.post('/api/upload', formData, {
+            console.log('Uploading file:', {
+                name: selectedFile.name,
+                type: selectedFile.type,
+                size: selectedFile.size
+            });
+
+            const response = await axios.post('http://localhost:8000/api/upload', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -121,12 +142,13 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                 },
             });
 
+            console.log('Upload response:', response.data);
             await fetchResumes();
             setSelectedFile(null);
             setUploadProgress(0);
         } catch (err) {
-            setError('Failed to upload file. Please try again.');
-            console.error('Error uploading file:', err);
+            console.error('Upload error:', err);
+            setError('Failed to upload file: ' + (err.response?.data?.detail || err.message || 'Unknown error'));
         } finally {
             setUploading(false);
         }
@@ -137,7 +159,7 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
 
         try {
             setError(null);
-            await axios.delete(`/api/resumes/${resumeId}`);
+            await axios.delete(`http://localhost:8000/api/resumes/${resumeId}`);
             await fetchResumes();
         } catch (err) {
             setError('Failed to delete item. Please try again.');
@@ -148,13 +170,13 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
     const handleDownload = async (resumeId) => {
         try {
             setError(null);
-            const response = await axios.get(`/api/resumes/${resumeId}/download`, {
+            const response = await axios.get(`http://localhost:8000/api/resumes/${resumeId}/download`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `resume-${resumeId}.pdf`);
+            link.setAttribute('download', `resume-${resumeId}`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -173,9 +195,9 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
         try {
             setLoading(true);
             setError('');
-            await axios.post('/api/resumes/folders', {
+            await axios.post('http://localhost:8000/api/resumes/folders', {
                 name: newFolderName,
-                parentFolder: currentFolder
+                parentId: currentFolder
             });
             setNewFolderName('');
             setShowNewFolderDialog(false);
@@ -214,28 +236,69 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
 
     const handleItemSelect = (item) => {
         console.log('Item selected:', item);
-        if (item.type === 'folder') {
-            // If it's a folder, toggle selection of all items in that folder
+        if (item.type === 'directory') {
+            // If it's a directory, select all files in that directory
             const folderPath = currentFolder ? `${currentFolder}/${item.name}` : item.name;
-            const newSelectedItems = new Set(selectedItems);
+            console.log('Selecting folder:', folderPath);
 
-            if (newSelectedItems.has(folderPath)) {
-                newSelectedItems.delete(folderPath);
-            } else {
-                newSelectedItems.add(folderPath);
-            }
+            // Get all files in the directory recursively
+            const getAllFiles = async (path) => {
+                try {
+                    const response = await fetch(`http://localhost:8000/api/resumes?path=original&subdir=${encodeURIComponent(path)}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch directory contents');
+                    }
+                    const items = await response.json();
 
-            setSelectedItems(newSelectedItems);
-            // Also trigger the onResumeSelect for the folder
-            onResumeSelect({
-                ...item,
-                id: folderPath,
-                path: folderPath,
-                name: item.name,
-                type: 'folder'
+                    let files = [];
+                    for (const subItem of items) {
+                        if (subItem.type === 'file') {
+                            files.push({
+                                id: subItem.id,
+                                name: subItem.name,
+                                path: subItem.path,
+                                type: 'file',
+                                uploadDate: subItem.uploadDate
+                            });
+                        } else if (subItem.type === 'directory') {
+                            const subPath = path ? `${path}/${subItem.name}` : subItem.name;
+                            const subFiles = await getAllFiles(subPath);
+                            files = files.concat(subFiles);
+                        }
+                    }
+                    return files;
+                } catch (error) {
+                    console.error('Error getting files from directory:', error);
+                    return [];
+                }
+            };
+
+            // Get all files in the directory
+            getAllFiles(folderPath).then(files => {
+                console.log('Files in directory:', files);
+
+                // Check if all files are already selected
+                const allSelected = files.every(file =>
+                    selectedResumes.some(selected => selected.id === file.id)
+                );
+
+                if (allSelected) {
+                    // If all files are selected, deselect them all
+                    files.forEach(file => {
+                        onResumeSelect(file);
+                    });
+                } else {
+                    // If not all files are selected, select only the unselected ones
+                    files.forEach(file => {
+                        const isSelected = selectedResumes.some(selected => selected.id === file.id);
+                        if (!isSelected) {
+                            onResumeSelect(file);
+                        }
+                    });
+                }
             });
         } else {
-            // If it's a file, just select the file
+            // If it's a file, select it
             const fileData = {
                 id: item.id,
                 name: item.name,
@@ -343,7 +406,7 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                     }}>
                         {currentFolder && (
                             <Button
-                                startIcon={<NavigateNextIcon sx={{ transform: 'rotate(180deg)' }} />}
+                                startIcon={<ArrowBackIcon />}
                                 onClick={handleBackClick}
                                 sx={{
                                     color: 'primary.main',
@@ -396,7 +459,7 @@ const ResumeManager = ({ open, onClose, onResumeSelect, selectedResumes }) => {
                                     >
                                         <Checkbox
                                             edge="start"
-                                            checked={selectedItems.has(resume.path) || selectedResumes?.some(r => r.id === resume.id)}
+                                            checked={selectedItems.has(resume.id) || selectedResumes?.some(r => r.id === resume.id)}
                                             onChange={() => handleItemSelect(resume)}
                                         />
                                         <ListItemText

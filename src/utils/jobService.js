@@ -1,4 +1,4 @@
-import supabase from '../utils/supabase'; 
+import supabase from '../utils/supabase';
 
 export const createJob = async (jobData) => {
   if (!supabase) {
@@ -15,17 +15,17 @@ export const createJob = async (jobData) => {
     const dataToInsert = {
       title: jobData.title,
       description: jobData.description,
-      department: jobData.department,         
+      department: jobData.department,
       location: jobData.location,
-      job_type: jobData.type,            
-      experience_level: jobData.experience,    
-      
+      job_type: jobData.type,
+      experience_level: jobData.experience,
+
       // User added these columns as JSONB or TEXT
       skills: Array.isArray(jobData.skills) ? jobData.skills : [],
       responsibilities: Array.isArray(jobData.responsibilities) ? jobData.responsibilities : [],
       qualifications: Array.isArray(jobData.qualifications) ? jobData.qualifications : [],
       status: jobData.status, // User added this column as TEXT
-      
+
       salary_range: (jobData.salary && typeof jobData.salary.min === 'number' && typeof jobData.salary.max === 'number')
         ? `${jobData.salary.min}k - ${jobData.salary.max}k${jobData.salary.isMonthly ? '/month' : '/year'}`
         : null,
@@ -58,8 +58,8 @@ export const getJobs = async () => {
     console.error('Supabase client is not initialized (from supabase.js). Cannot fetch jobs.');
     // Fallback to mock for local development
     return new Promise(resolve => setTimeout(() => {
-        console.log('(Mock) Fetched jobs because Supabase is not configured.');
-        resolve({ success: true, data: [] }); // Return empty array for mock
+      console.log('(Mock) Fetched jobs because Supabase is not configured.');
+      resolve({ success: true, data: [] }); // Return empty array for mock
     }, 500));
   }
 
@@ -81,15 +81,17 @@ export const getJobs = async () => {
 };
 
 export const getJob = async (jobId) => {
+  console.log("getJob called with jobId:", jobId);
   if (!supabase) {
     console.error('Supabase client is not initialized (from supabase.js). Cannot fetch job.');
-     return new Promise(resolve => setTimeout(() => {
+    return new Promise(resolve => setTimeout(() => {
       console.log('(Mock) Fetched job because Supabase is not configured.');
-      resolve({ success: true, job: { id: jobId, title: "Mock Job Detail", description: "This is a mock job loaded because Supabase is not configured."} });
+      resolve({ success: true, job: { id: jobId, title: "Mock Job Detail", description: "This is a mock job loaded because Supabase is not configured." } });
     }, 500));
   }
 
   try {
+    console.log("Fetching job from Supabase...");
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
@@ -100,6 +102,7 @@ export const getJob = async (jobId) => {
       console.error(`Error fetching job ${jobId} from Supabase:`, error);
       throw error;
     }
+    console.log("Supabase response:", data);
     return { success: true, job: data };
   } catch (error) {
     console.error('Supabase operation failed in getJob:', error);

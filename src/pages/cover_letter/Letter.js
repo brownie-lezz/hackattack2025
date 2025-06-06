@@ -1,7 +1,6 @@
-import { useState, useRef, useContext } from "react";
+import { useState, useRef, useContext, useEffect } from "react";
 // Rich text editor input
 import ReactQuill from "react-quill";
-import "react-quill/dist/quill.snow.css";
 // Print HTML as PDF
 import ReactToPrint from "react-to-print";
 
@@ -11,6 +10,27 @@ import { profile_urls } from "../../utils/config";
 import CoverLetter from "./CoverLetter";
 import CompanyInput from "./CompnayInput";
 import ProfileInput from "./ProfileInput";
+
+// Import our custom Quill styles
+import "./QuillEditor.css";
+
+// Quill editor modules configuration
+const modules = {
+  toolbar: [
+    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+    [{ 'color': [] }, { 'background': [] }],
+    ['clean']
+  ],
+};
+
+const formats = [
+  'header',
+  'bold', 'italic', 'underline', 'strike',
+  'list', 'bullet',
+  'color', 'background'
+];
 
 const Letter = () => {
   // To refrence the cover letter HTML, used for printing as pdf
@@ -251,13 +271,13 @@ const Letter = () => {
                 aria-labelledby="headingFour"
                 data-bs-parent="#accordionExample"
               >
-                <div className="accordion-body" style={{ height: "400px" }}>
+                <div className="accordion-body">
                   <ReactQuill
                     theme="snow"
                     value={body}
                     onChange={setBody}
-                    placeholder="Enter letter body here"
-                    style={{ height: "300px" }}
+                    modules={modules}
+                    formats={formats}
                   />
                 </div>
               </div>

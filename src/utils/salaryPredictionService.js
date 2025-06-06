@@ -11,7 +11,7 @@ const mapExperienceLevel = (experience) => {
     'Internship': 'Internship',
     'Entry-Level': 'Entry level',
     'Junior': 'Entry level',
-    'Mid-Level': 'Associate', 
+    'Mid-Level': 'Associate',
     'Senior': 'Mid-Senior level',
     'Lead': 'Mid-Senior level',
     'Manager': 'Director',
@@ -53,11 +53,11 @@ export const testApiConnection = async () => {
     const response = await fetch(`${baseUrl}/api/test`, {
       method: 'GET',
     });
-    
+
     if (!response.ok) {
       throw new Error(`API test failed with status: ${response.status}`);
     }
-    
+
     const result = await response.json();
     console.log("API test result:", result);
     return true;
@@ -73,14 +73,14 @@ export const testApiConnection = async () => {
 export const getSalaryPrediction = async (jobData) => {
   try {
     console.log("getSalaryPrediction called with data:", jobData);
-    
+
     // Test connection first
     const connectionOk = await testApiConnection();
     if (!connectionOk) {
       console.warn("API connection test failed, using fallback data");
       throw new Error("API connection failed");
     }
-    
+
     // Format request data to match the model's expected input
     const requestData = {
       title: jobData.title || '',
@@ -89,13 +89,13 @@ export const getSalaryPrediction = async (jobData) => {
       experienceLevel: mapExperienceLevel(jobData.experience || 'Mid-Level'),
       industry: jobData.department || 'Technology',
       skills: jobData.skills || [],
-      education: jobData.qualifications?.find(q => 
+      education: jobData.qualifications?.find(q =>
         q.toLowerCase().includes('degree') || q.toLowerCase().includes('education')
       ) || '',
-      certification: jobData.qualifications?.find(q => 
+      certification: jobData.qualifications?.find(q =>
         q.toLowerCase().includes('certification') || q.toLowerCase().includes('license')
       ) || '',
-      experience: jobData.qualifications?.find(q => 
+      experience: jobData.qualifications?.find(q =>
         q.toLowerCase().includes('year') || q.toLowerCase().includes('experience')
       ) || '',
       remote: jobData.location?.toLowerCase().includes('remote') || false,
@@ -105,17 +105,17 @@ export const getSalaryPrediction = async (jobData) => {
 
     // Handle potential trailing slash in API_URL
     const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
-    const endpoint = API_ENDPOINTS.SALARY_PREDICTION.startsWith('/') ? 
-      API_ENDPOINTS.SALARY_PREDICTION : 
+    const endpoint = API_ENDPOINTS.SALARY_PREDICTION.startsWith('/') ?
+      API_ENDPOINTS.SALARY_PREDICTION :
       '/' + API_ENDPOINTS.SALARY_PREDICTION;
-    
+
     console.log("Making API call to:", `${baseUrl}${endpoint}`);
     console.log("With request data:", requestData);
 
     // Production API call with improved CORS handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
+
     try {
       // Try the most compatible fetch options
       const fetchOptions = {
@@ -128,20 +128,20 @@ export const getSalaryPrediction = async (jobData) => {
         body: JSON.stringify(requestData),
         signal: controller.signal
       };
-      
+
       console.log("Using fetch options:", fetchOptions);
       const response = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
-      
+
       clearTimeout(timeoutId);
       console.log("API response status:", response.status);
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const result = await response.json();
       console.log("API result:", result);
-      
+
       if (result.success) {
         return {
           estimatedSalary: result.monthly || result.estimatedSalary,
@@ -174,14 +174,14 @@ export const getSalaryPrediction = async (jobData) => {
 export const getSimilarJobs = async (jobData) => {
   try {
     console.log("getSimilarJobs called with data:", jobData);
-    
+
     // Test connection first
     const connectionOk = await testApiConnection();
     if (!connectionOk) {
       console.warn("API connection test failed, using fallback data");
       return getMockSimilarJobs();
     }
-    
+
     // Prepare request data
     const requestData = {
       title: jobData.title || '',
@@ -192,17 +192,17 @@ export const getSimilarJobs = async (jobData) => {
 
     // Handle potential trailing slash in API_URL
     const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
-    const endpoint = API_ENDPOINTS.SIMILAR_JOBS.startsWith('/') ? 
-      API_ENDPOINTS.SIMILAR_JOBS : 
+    const endpoint = API_ENDPOINTS.SIMILAR_JOBS.startsWith('/') ?
+      API_ENDPOINTS.SIMILAR_JOBS :
       '/' + API_ENDPOINTS.SIMILAR_JOBS;
-    
+
     console.log("Making API call to:", `${baseUrl}${endpoint}`);
     console.log("With request data:", requestData);
 
     // Production API call with extended timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
+
     try {
       // Try the most compatible fetch options first
       const fetchOptions = {
@@ -215,35 +215,35 @@ export const getSimilarJobs = async (jobData) => {
         body: JSON.stringify(requestData),
         signal: controller.signal
       };
-      
+
       console.log("Using fetch options:", fetchOptions);
       const response = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
-      
+
       clearTimeout(timeoutId);
       console.log("API response status:", response.status);
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const results = await response.json();
       console.log("API results:", results);
-      
+
       return Array.isArray(results) ? results : [];
     } catch (fetchError) {
       clearTimeout(timeoutId);
       console.error("Fetch error in getSimilarJobs:", fetchError);
-      
+
       // If we get a CORS error, try again with alternative approach or fall back to mock data
       console.log("Falling back to mock data due to fetch error");
       return getMockSimilarJobs();
     }
-    
+
   } catch (error) {
     console.error('Similar jobs error:', error);
     return getMockSimilarJobs(); // Return mock data on error
   }
-}; 
+};
 
 /**
  * Get mock similar jobs for fallback

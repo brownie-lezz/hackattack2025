@@ -28,13 +28,13 @@ const API_ENDPOINTS = {
   SIGNUP: "api/signup",
   RESET_PASSWORD: "api/reset-password",
   RESET_PASSWORD_CONFIRM: "api/reset-password-confirm",
-  
+
   // Profiles
   SEEKER_PROFILE: "api/profile/seeker",
   EMPLOYER_PROFILE: "api/profile/employer",
   COMPANY_PROFILE: "api/profile/employer/:id",
   APPLICANT_PROFILE: "api/profile/seeker/:id",
-  
+
   // Jobs
   JOBS: "api/jobs",
   JOB_CREATE: "api/jobs/create",
@@ -47,13 +47,13 @@ const API_ENDPOINTS = {
   JOB_BOOKMARK: "api/jobs/:job_id/bookmark",
   JOB_BOOKMARK_DELETE: "api/jobs/:job_id/bookmark/delete",
   JOB_BOOKMARK_LIST: "api/jobs/bookmarks",
-  
+
   // Applications
   JOB_APPLICATIONS: "api/jobs/:id/applications",
   USER_APPLICATIONS: "api/jobs/user-applications",
   APPLICATION_CREATE: "api/jobs/applications/create",
   APPLICATION_DETAIL: "api/jobs/applications/:id",
-  
+
   // AI Features
   GENERATE_QUESTIONS: "api/generate-questions",
   APPLICANT_RANKING: "api/jobs/applicant-ranking/:id",
@@ -98,10 +98,10 @@ const urls = {
   SIMILAR_JOBS: API_ENDPOINTS.SIMILAR_JOBS
 };
 
-export { 
-  API_URL, 
-  SUPABASE_URL, 
-  SUPABASE_ANON_KEY, 
+export {
+  API_URL,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
   SUPABASE_TABLES,
   SUPABASE_STORAGE,
   API_ENDPOINTS,

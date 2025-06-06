@@ -6,7 +6,7 @@ import os
 import traceback
 from .multi_layer_perceptron import CustomNeuralNetRegressor, Model, TensorTransformer
 import socket
-from careerjet_api_client import CareerjetAPIClient
+from .careerjet_client import CareerjetAPIClient
 from . import salary
 
 class SalaryPredictionService:
@@ -127,14 +127,114 @@ class SalaryPredictionService:
                 estimated_salary = f"${monthly_salary:,.2f}/month"
             else:
                 estimated_salary = f"${yearly_salary:,.2f}/year"
-                
+            
+            # Calculate market trends and insights
+            experience_level = job_data.get('formatted_experience_level', 'Entry level')
+            industry = job_data.get('company_industries', 'Technology')
+            education = job_data.get('education_requirement', '')
+            location = job_data.get('location', 'Remote')
+            skills = job_data.get('skill_requirement', '').split(',')
+            remote = job_data.get('remote_allowed', False)
+            company_size = job_data.get('company_employee_count', 500)
+            
+            # Determine market trend based on experience level and industry
+            trend = 'stable'
+            if experience_level in ['Senior', 'Lead', 'Manager']:
+                trend = 'up'
+            elif experience_level == 'Entry level':
+                trend = 'down'
+            
+            # Calculate education impact
+            education_impact = 0
+            if 'Master' in education:
+                education_impact = 20
+            elif 'Bachelor' in education:
+                education_impact = 15
+            elif 'PhD' in education:
+                education_impact = 30
+            
+            # Determine job availability
+            availability = 70  # Default value
+            if industry == 'Technology':
+                availability = 85
+            elif industry == 'Healthcare':
+                availability = 90
+            elif industry == 'Finance':
+                availability = 75
+            
+            # Determine competition level (1-5)
+            competition = 3  # Default value
+            if experience_level == 'Entry level':
+                competition = 4
+            elif experience_level in ['Senior', 'Lead']:
+                competition = 2
+            
+            # Extract top skills from the job data
+            top_skills = [skill.strip() for skill in skills if skill.strip()][:5]
+            
+            # Calculate salary factors
+            salary_factors = []
+            
+            # Location impact
+            location_impact = 0
+            if 'New York' in location or 'San Francisco' in location or 'Seattle' in location:
+                location_impact = 20
+                salary_factors.append("High cost of living area (+20%)")
+            elif 'Remote' in location:
+                location_impact = -10
+                salary_factors.append("Remote position (-10%)")
+            
+            # Industry impact
+            industry_impact = 0
+            if industry == 'Technology':
+                industry_impact = 15
+                salary_factors.append("Technology industry premium (+15%)")
+            elif industry == 'Finance':
+                industry_impact = 10
+                salary_factors.append("Finance industry premium (+10%)")
+            
+            # Experience impact
+            experience_impact = 0
+            if experience_level == 'Senior':
+                experience_impact = 25
+                salary_factors.append("Senior level position (+25%)")
+            elif experience_level == 'Lead':
+                experience_impact = 35
+                salary_factors.append("Lead position (+35%)")
+            elif experience_level == 'Manager':
+                experience_impact = 40
+                salary_factors.append("Manager position (+40%)")
+            
+            # Company size impact
+            company_size_impact = 0
+            if company_size > 1000:
+                company_size_impact = 10
+                salary_factors.append("Large company premium (+10%)")
+            elif company_size < 50:
+                company_size_impact = -5
+                salary_factors.append("Small company adjustment (-5%)")
+            
+            # Calculate total impact
+            total_impact = location_impact + industry_impact + experience_impact + company_size_impact
+            
             # Format response with both yearly and monthly values
             result = {
                 "success": True,
                 "estimatedSalary": estimated_salary,
                 "yearly": f"${yearly_salary:,.2f}/year",
                 "monthly": f"${yearly_salary/12:,.2f}/month",
-                "salaryValue": round(yearly_salary/1000)  # In thousands
+                "salaryValue": round(yearly_salary/1000),  # In thousands
+                "trend": trend,
+                "educationImpact": education_impact,
+                "availability": availability,
+                "competition": competition,
+                "topSkills": top_skills,
+                "salaryFactors": salary_factors,
+                "totalImpact": total_impact,
+                "locationImpact": location_impact,
+                "industryImpact": industry_impact,
+                "experienceImpact": experience_impact,
+                "companySizeImpact": company_size_impact
             }
             
             return result
@@ -172,7 +272,7 @@ class SalaryPredictionService:
                 s.connect(("8.8.8.8", 80))
                 local_ip = s.getsockname()[0]
                 s.close()
-            except:
+            except Exception:
                 local_ip = '127.0.0.1'
             
             # Create search query
@@ -194,6 +294,10 @@ class SalaryPredictionService:
             
             # Execute the search
             result_json = cj.search(search_params)
+            
+            # Check if the API call was successful
+            if not result_json or 'jobs' not in result_json:
+                raise RuntimeError("No jobs found or invalid response from Careerjet API")
             
             # Format the results to match our expected structure
             similar_jobs = []
@@ -218,40 +322,43 @@ class SalaryPredictionService:
                                     # Convert to thousands for consistency with frontend
                                     salary_min = round(min_val / 1000)
                                     salary_max = round(max_val / 1000)
-                                except:
+                                except ValueError:
                                     pass
                     
-                    # Extract skills (simplified - in production would need NLP)
+                    # Extract skills from description if available
                     skills = []
                     if 'description' in job and job['description']:
-                        # Very simple skill extraction based on common tech keywords
-                        common_skills = ["Python", "JavaScript", "React", "TypeScript", "Node.js", 
-                                        "Java", "C++", "AWS", "Docker", "Kubernetes"]
+                        # Simple skill extraction - in production, use a more sophisticated approach
+                        common_skills = ['Python', 'JavaScript', 'Java', 'C++', 'React', 'Angular', 'Vue', 'Node.js', 
+                                       'AWS', 'Azure', 'Docker', 'Kubernetes', 'SQL', 'NoSQL', 'Machine Learning', 
+                                       'AI', 'Data Science', 'DevOps', 'Agile', 'Scrum']
                         for skill in common_skills:
                             if skill.lower() in job['description'].lower():
                                 skills.append(skill)
                     
-                    # Build the job object, with salary only if valid values were extracted
+                    # Create job object with all available information
                     job_obj = {
                         'title': job.get('title', ''),
                         'company': job.get('company', ''),
                         'location': job.get('locations', ''),
-                        'url': job.get('url', '#'),
-                        'skills': skills or ["Not specified"]
+                        'url': job.get('url', ''),  # Make sure to include the URL
+                        'description': job.get('description', ''),
+                        'skills': skills[:5],  # Limit to top 5 skills
                     }
                     
-                    # Add salary to job_obj only if both min and max are valid
+                    # Add salary if available
                     if salary_min is not None and salary_max is not None:
-                        job_obj['salary'] = {'min': salary_min, 'max': salary_max}
+                        job_obj['salary'] = {
+                            'min': salary_min,
+                            'max': salary_max
+                        }
                     
                     similar_jobs.append(job_obj)
-                    
-            # Return all processed jobs if any were found, or an empty list if 'jobs' was missing/empty initially
+            
             return similar_jobs
-                
+            
         except Exception as e:
-            # Raising the exception to be handled by the route
-            raise RuntimeError(f"Error fetching or processing similar jobs from Careerjet: {e}")
+            raise RuntimeError(f"Error getting similar jobs: {str(e)}")
 
 
 # Singleton instance

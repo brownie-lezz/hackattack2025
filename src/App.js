@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, CircularProgress, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 
 import { AuthProvider } from "./context/AuthContext";
+import HealthCheck from "./components/HealthCheck";
 
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
@@ -47,6 +48,7 @@ import Letter from "./pages/cover_letter/Letter";
 import ResumeScreeningDashboard from './components/ResumeScreening/ResumeScreeningDashboard';
 import AIExamination from './pages/ai-examination/AIExamination';
 import Footer from "./components/Footer";
+import MarketAnalysis from './pages/market-analysis/MarketAnalysis';
 
 const theme = createTheme({
   palette: {
@@ -87,70 +89,88 @@ const theme = createTheme({
   },
 });
 
-const App = () => (
-  <BrowserRouter>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <AuthProvider>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route exact path="/login" element={<Login />} />
-          <Route exact path="/logout" element={<Logout />} />
-          <Route exact path="/signup" element={<Signup />} />
-          <Route exact path="/signup-employer" element={<EmployerSignup />} />
-          <Route exact path="/reset-password" element={<ResetPassword />} />
-          <Route
-            exact
-            path="/reset-password-confirm"
-            element={<ResetPasswordConfirm />}
-          />
-          <Route exact path="/profile/seeker" element={<SeekerProfile />} />
-          <Route exact path="/profile/seeker/update" element={<SeekerProfileUpdate />} />
-          <Route exact path="/profile/seeker/update-new" element={<UpdateProfile />} />
-          <Route exact path="/profile/seeker/:id" element={<ApplicantProfile />} />
-          <Route exact path="/profile/employer" element={<EmployerProfile />} />
-          <Route exact path="/profile/employer/update" element={<EmployerProfileUpdate />} />
-          <Route exact path="/profile/employer/update-new" element={<UpdateProfile />} />
-          <Route exact path="/profile/employer/:id" element={<CompanyProfile />} />
-          <Route exact path="/jobs" element={<JobList />} />
-          <Route exact path="/jobs/:id" element={<JobDetail />} />
-          <Route exact path="/jobs/:id/update" element={<JobUpdate />} />
-          <Route exact path="/jobs/:id/delete" element={<JobDelete />} />
-          <Route exact path="/jobs/create" element={<JobCreate />} />
-          <Route exact path="/jobs/create-ai" element={<JobCreationPage />} />
-          <Route exact path="/jobs/employer" element={<EmployerJobList />} />
-          <Route exact path="/jobs/explore" element={<ScrapedJobList />} />
-          <Route exact path="/jobs/bookmarks" element={<BookmarkJobList />} />
-          <Route
-            exact
-            path="/jobs/recommendations"
-            element={<RecommendedJobList />}
-          />
-          <Route
-            exact
-            path="/jobs/applications"
-            element={<SeekerApplicationsList />}
-          />
-          <Route
-            exact
-            path="/jobs/:id/applications"
-            element={<JobApplicationsList />}
-          />
-          <Route exact path="/jobs/:id/apply" element={<ApplicationCreate />} />
-          <Route
-            exact
-            path="/jobs/:id/applicant-ranking"
-            element={<ResumeRanking />}
-          />
-          <Route exact path="/cover-letter" element={<Letter />} />
-          <Route path="/resume-screening" element={<ResumeScreeningDashboard />} />
-          <Route path="/jobs/:id/ai-examination" element={<AIExamination />} />
-        </Routes>
-        <Footer />
-      </AuthProvider>
-    </ThemeProvider>
-  </BrowserRouter>
-);
+const App = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate initial loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+        bgcolor="background.default"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  return (
+    <BrowserRouter>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AuthProvider>
+          <HealthCheck />
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route exact path="/login" element={<Login />} />
+            <Route exact path="/logout" element={<Logout />} />
+            <Route exact path="/signup" element={<Signup />} />
+            <Route exact path="/signup-employer" element={<EmployerSignup />} />
+            <Route exact path="/reset-password" element={<ResetPassword />} />
+            <Route exact path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
+
+            {/* Profile Routes */}
+            <Route exact path="/profile/seeker" element={<SeekerProfile />} />
+            <Route exact path="/profile/seeker/update" element={<SeekerProfileUpdate />} />
+            <Route exact path="/profile/seeker/update-new" element={<UpdateProfile />} />
+            <Route exact path="/profile/seeker/:id" element={<ApplicantProfile />} />
+            <Route exact path="/profile/employer" element={<EmployerProfile />} />
+            <Route exact path="/profile/employer/update" element={<EmployerProfileUpdate />} />
+            <Route exact path="/profile/employer/update-new" element={<UpdateProfile />} />
+            <Route exact path="/profile/employer/:id" element={<CompanyProfile />} />
+
+            {/* Job Routes */}
+            <Route exact path="/jobs" element={<JobList />} />
+            <Route exact path="/jobs/:id" element={<JobDetail />} />
+            <Route exact path="/jobs/:id/update" element={<JobUpdate />} />
+            <Route exact path="/jobs/:id/delete" element={<JobDelete />} />
+            <Route exact path="/jobs/create" element={<JobCreate />} />
+            <Route exact path="/jobs/create-ai" element={<JobCreationPage />} />
+            <Route exact path="/jobs/employer" element={<EmployerJobList />} />
+            <Route exact path="/jobs/explore" element={<ScrapedJobList />} />
+            <Route exact path="/jobs/recommendations" element={<RecommendedJobList />} />
+            <Route exact path="/jobs/applications" element={<SeekerApplicationsList />} />
+            <Route exact path="/jobs/:id/applications" element={<JobApplicationsList />} />
+            <Route exact path="/jobs/:id/apply" element={<ApplicationCreate />} />
+            <Route exact path="/jobs/:id/applicant-ranking" element={<ResumeRanking />} />
+            <Route exact path="/jobs/:id/ai-examination" element={<AIExamination />} />
+
+            {/* Other Routes */}
+            <Route exact path="/cover-letter" element={<Letter />} />
+            <Route path="/resume-screening" element={<ResumeScreeningDashboard />} />
+            <Route path="/mbti-analysis" element={<div>MBTI Analysis Page (Coming Soon)</div>} />
+            <Route path="/market-analysis" element={<MarketAnalysis />} />
+
+            {/* 404 Route */}
+            <Route path="*" element={<div>404 - Page Not Found</div>} />
+          </Routes>
+          <Footer />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+};
 
 export default App;
